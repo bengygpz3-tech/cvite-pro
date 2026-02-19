@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVite Pro — Panneau Admin</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #0f0f1a; --surface: #1a1a2e; --panel: #16213e;
+  --border: #2a2a4a; --gold: #c9a84c; --gold2: #f0d98b;
+  --teal: #00b4d8; --green: #2ecc71; --red: #e74c3c;
+  --orange: #f39c12; --text: #e8e4f0; --muted: #666688;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+}
+
+body { font-family: var(--font); background: var(--ink); color: var(--text); min-height: 100vh; }
+
+/* ── LOGIN ── */
+#loginScreen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 30% 50%, #1a1a3e 0%, #0f0f1a 70%);
+}
+.login-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+  padding: 3rem 2.5rem; max-width: 400px; width: 90%; text-align: center;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+}
+.login-logo { font-size: 2rem; font-weight: 700; color: white; margin-bottom: 0.2rem; font-family: Georgia, serif; }
+.login-logo em { color: var(--gold); font-style: normal; }
+.login-sub { color: var(--muted); font-size: 0.84rem; margin-bottom: 2rem; }
+.login-input {
+  width: 100%; padding: 0.85rem 1rem; background: var(--ink); border: 1.5px solid var(--border);
+  border-radius: 10px; color: white; font-size: 0.95rem; font-family: var(--font);
+  margin-bottom: 0.75rem; transition: border-color 0.2s;
+}
+.login-input:focus { outline: none; border-color: var(--gold); }
+.login-btn {
+  width: 100%; padding: 0.9rem; background: var(--gold); border: none; border-radius: 10px;
+  font-family: var(--font); font-weight: 700; font-size: 0.95rem; cursor: pointer;
+  color: var(--ink); transition: all 0.2s;
+}
+.login-btn:hover { background: #b8943d; }
+.login-err { color: var(--red); font-size: 0.82rem; margin-top: 0.5rem; min-height: 1.1rem; }
+
+/* ── APP ── */
+#app { display: none; min-height: 100vh; }
+#app.visible { display: block; }
+
+/* HEADER */
+.hdr {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 1.8rem; display: flex; align-items: center; justify-content: space-between;
+  height: 58px; position: sticky; top: 0; z-index: 100;
+}
+.hdr-logo { font-family: Georgia, serif; font-size: 1.3rem; font-weight: 700; color: white; }
+.hdr-logo em { color: var(--gold); font-style: normal; }
+.hdr-logo sup { font-size: 0.5rem; background: var(--gold); color: var(--ink); padding: 0.1rem 0.35rem; border-radius: 3px; font-weight: 700; font-family: var(--font); vertical-align: super; }
+.hdr-right { display: flex; align-items: center; gap: 1rem; }
+.hdr-user { font-size: 0.8rem; color: var(--muted); }
+.logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; padding: 0.38rem 0.85rem; border-radius: 7px; font-size: 0.78rem; font-family: var(--font); transition: all 0.2s; }
+.logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* LAYOUT */
+.layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 58px); }
+
+/* NAV */
+nav { background: var(--surface); border-right: 1px solid var(--border); padding: 1.5rem 0; }
+.nav-item {
+  display: flex; align-items: center; gap: 0.65rem; padding: 0.7rem 1.5rem;
+  color: var(--muted); cursor: pointer; font-size: 0.85rem; font-weight: 500;
+  transition: all 0.2s; border-left: 2px solid transparent;
+}
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.nav-item.on { color: var(--gold); background: rgba(201,168,76,0.08); border-left-color: var(--gold); }
+.nav-icon { font-size: 1rem; }
+.nav-sep { height: 1px; background: var(--border); margin: 0.75rem 1.5rem; }
+
+/* CONTENT */
+.content { padding: 2rem; overflow-y: auto; }
+
+/* PANELS */
+.panel { display: none; }
+.panel.on { display: block; }
+
+/* ── STATS CARDS ── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.stat-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1.3rem 1.5rem; display: flex; flex-direction: column; gap: 0.4rem;
+}
+.stat-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.stat-val { font-size: 2rem; font-weight: 700; line-height: 1; }
+.stat-val.gold { color: var(--gold); }
+.stat-val.green { color: var(--green); }
+.stat-val.red { color: var(--red); }
+.stat-val.orange { color: var(--orange); }
+.stat-val.teal { color: var(--teal); }
+
+/* ── TABLE ── */
+.table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.table-head { padding: 1.2rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); gap: 1rem; flex-wrap: wrap; }
+.table-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.search-input { background: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.85rem; color: var(--text); font-size: 0.82rem; font-family: var(--font); min-width: 220px; }
+.search-input:focus { outline: none; border-color: var(--gold); }
+table { width: 100%; border-collapse: collapse; }
+th { padding: 0.75rem 1rem; text-align: left; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 0.82rem 1rem; font-size: 0.83rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+.td-name { font-weight: 600; color: white; }
+.td-email { color: var(--muted); font-size: 0.78rem; }
+.td-key { font-family: monospace; font-size: 0.78rem; color: var(--gold); background: rgba(201,168,76,0.1); padding: 0.2rem 0.5rem; border-radius: 5px; letter-spacing: 0.05em; }
+
+/* STATUS BADGES */
+.badge { display: inline-flex; align-items: center; gap: 0.28rem; padding: 0.22rem 0.65rem; border-radius: 20px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+.b-active  { background: rgba(46,204,113,0.15);  color: #2ecc71; }
+.b-expired { background: rgba(231,76,60,0.15);   color: #e74c3c; }
+.b-blocked { background: rgba(231,76,60,0.25);   color: #ff6b6b; border: 1px solid rgba(231,76,60,0.4); }
+.b-trial   { background: rgba(243,156,18,0.15);  color: #f39c12; }
+
+/* ACTION BUTTONS */
+.actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.ab { border: none; border-radius: 6px; padding: 0.3rem 0.62rem; font-size: 0.73rem; font-weight: 700; cursor: pointer; font-family: var(--font); transition: all 0.2s; white-space: nowrap; }
+.ab-teal   { background: rgba(0,180,216,0.15); color: var(--teal); }
+.ab-teal:hover { background: rgba(0,180,216,0.3); }
+.ab-green  { background: rgba(46,204,113,0.15); color: var(--green); }
+.ab-green:hover { background: rgba(46,204,113,0.3); }
+.ab-red    { background: rgba(231,76,60,0.15); color: var(--red); }
+.ab-red:hover { background: rgba(231,76,60,0.3); }
+.ab-gold   { background: rgba(201,168,76,0.15); color: var(--gold); }
+.ab-gold:hover { background: rgba(201,168,76,0.3); }
+.ab-gray   { background: rgba(255,255,255,0.06); color: var(--muted); }
+.ab-gray:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+
+/* ── MODAL ── */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 500; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; max-width: 520px; width: 92%; box-shadow: 0 30px 80px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
+.modal-title { font-size: 1.1rem; font-weight: 700; color: white; margin-bottom: 0.3rem; }
+.modal-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.5rem; }
+.form-row { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem; }
+.form-row label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.form-row input, .form-row select, .form-row textarea {
+  background: var(--ink); border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 0.62rem 0.85rem; color: var(--text); font-size: 0.87rem; font-family: var(--font); width: 100%;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus { outline: none; border-color: var(--gold); }
+.form-row textarea { resize: vertical; min-height: 70px; }
+.form-row select option { background: var(--ink); }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+.modal-btns { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.5rem; }
+.mbtn { font-family: var(--font); font-size: 0.83rem; font-weight: 700; padding: 0.6rem 1.2rem; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+.mbtn-gold { background: var(--gold); color: var(--ink); }
+.mbtn-gold:hover { background: #b8943d; }
+.mbtn-gray { background: rgba(255,255,255,0.08); color: var(--text); }
+.mbtn-gray:hover { background: rgba(255,255,255,0.14); }
+.mbtn-red { background: var(--red); color: white; }
+.mbtn-red:hover { background: #c0392b; }
+
+/* ── EVENTS LOG ── */
+.ev-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 340px; overflow-y: auto; }
+.ev-item { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.6rem 0.75rem; border-radius: 8px; background: rgba(255,255,255,0.03); }
+.ev-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.ev-check   { background: var(--green); }
+.ev-blocked { background: var(--red); }
+.ev-expired { background: var(--orange); }
+.ev-created { background: var(--teal); }
+.ev-extended{ background: var(--gold); }
+.ev-default { background: var(--muted); }
+.ev-text { font-size: 0.8rem; color: var(--text); }
+.ev-time { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
+
+/* MISC */
+.page-title { font-size: 1.4rem; font-weight: 700; color: white; margin-bottom: 0.4rem; }
+.page-sub { font-size: 0.83rem; color: var(--muted); margin-bottom: 1.8rem; }
+.empty-state { text-align: center; padding: 3rem; color: var(--muted); font-size: 0.88rem; }
+.btn-new { background: var(--gold); color: var(--ink); border: none; border-radius: 9px; padding: 0.6rem 1.3rem; font-family: var(--font); font-size: 0.84rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4rem; }
+.btn-new:hover { background: #b8943d; transform: translateY(-1px); }
+.refresh-btn { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.85rem; font-family: var(--font); font-size: 0.78rem; cursor: pointer; transition: all 0.2s; }
+.refresh-btn:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+.toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.85rem 1.3rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; z-index: 999; transform: translateY(100px); transition: transform 0.3s ease; max-width: 320px; }
+.toast.show { transform: translateY(0); }
+.toast.success { background: #1a3d2e; color: #2ecc71; border: 1px solid #2ecc7155; }
+.toast.error   { background: #3d1a1a; color: #e74c3c; border: 1px solid #e74c3c55; }
+.divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+.info-box { background: rgba(0,180,216,0.08); border: 1px solid rgba(0,180,216,0.2); border-radius: 10px; padding: 1rem 1.2rem; font-size: 0.82rem; color: #88ddee; line-height: 1.7; }
+.warn-box { background: rgba(231,76,60,0.08); border: 1px solid rgba(231,76,60,0.2); border-radius: 10px; padding: 1rem 1.2rem; font-size: 0.82rem; color: #ff9999; line-height: 1.7; margin-bottom: 1rem; }
+.key-display { font-family: monospace; background: var(--ink); color: var(--gold); padding: 0.75rem 1rem; border-radius: 10px; font-size: 1rem; letter-spacing: 0.1em; display: flex; align-items: center; justify-content: space-between; margin: 0.5rem 0; }
+.copy-icon { cursor: pointer; background: none; border: none; color: var(--gold); font-size: 1.1rem; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">CV<em>ite</em> <sup style="font-size:0.52rem;background:var(--gold);color:var(--ink);padding:0.1rem 0.35rem;border-radius:3px;font-weight:700;vertical-align:super">PRO</sup></div>
+    <div class="login-sub">Panneau d'administration</div>
+    <input class="login-input" type="password" id="loginPwd" placeholder="Mot de passe administrateur"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Connexion →</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-logo">CV<em>ite</em><sup>ADMIN</sup></div>
+    <div class="hdr-right">
+      <span class="hdr-user">Connecté en tant qu'administrateur</span>
+      <button class="logout-btn" onclick="logout()">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- NAV -->
+    <nav>
+      <div class="nav-item on" onclick="showPanel('dashboard',this)"><span class="nav-icon">📊</span> Tableau de bord</div>
+      <div class="nav-item" onclick="showPanel('clients',this)"><span class="nav-icon">👥</span> Clients & Licences</div>
+      <div class="nav-sep"></div>
+      <div class="nav-item" onclick="showPanel('guide',this)"><span class="nav-icon">📖</span> Guide d'utilisation</div>
+      <div class="nav-item" onclick="showPanel('pricing',this)"><span class="nav-icon">💰</span> Tarification</div>
+    </nav>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- ══ DASHBOARD ══ -->
+      <div class="panel on" id="panel-dashboard">
+        <div class="page-title">📊 Tableau de bord</div>
+        <div class="page-sub">Vue d'ensemble de votre parc de licences CVite Pro</div>
+
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-card"><div class="stat-label">Total clients</div><div class="stat-val gold" id="sTotal">—</div></div>
+          <div class="stat-card"><div class="stat-label">Licences actives</div><div class="stat-val green" id="sActive">—</div></div>
+          <div class="stat-card"><div class="stat-label">Bloquées</div><div class="stat-val red" id="sBlocked">—</div></div>
+          <div class="stat-card"><div class="stat-label">Expirées</div><div class="stat-val orange" id="sExpired">—</div></div>
+          <div class="stat-card"><div class="stat-label">Connexions aujourd'hui</div><div class="stat-val teal" id="sToday">—</div></div>
+        </div>
+
+        <div class="info-box">
+          <strong>ℹ️ Comment fonctionne le blocage à distance ?</strong><br>
+          Chaque fois qu'un client ouvre CVite Pro, le logiciel contacte ce serveur pour vérifier sa licence.<br>
+          Si vous bloquez un client ici, <strong>dès sa prochaine ouverture</strong> il verra un écran de blocage et ne pourra plus accéder au logiciel.
+          Le blocage est instantané côté serveur — il prend effet au prochain lancement chez l'utilisateur.
+        </div>
+      </div>
+
+      <!-- ══ CLIENTS ══ -->
+      <div class="panel" id="panel-clients">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem">
+          <div>
+            <div class="page-title">👥 Clients & Licences</div>
+            <div class="page-sub">Gérez les accès de tous vos clients</div>
+          </div>
+          <div style="display:flex;gap:0.6rem">
+            <button class="refresh-btn" onclick="loadClients()">🔄 Actualiser</button>
+            <button class="btn-new" onclick="openModal('create')">＋ Nouveau client</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-head">
+            <span class="table-title">Liste des clients</span>
+            <input class="search-input" type="text" placeholder="Rechercher nom, email, clé…" oninput="filterClients(this.value)">
+          </div>
+          <div style="overflow-x:auto">
+            <table id="clientTable">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Clé de licence</th>
+                  <th>Plan</th>
+                  <th>Statut</th>
+                  <th>Expiration</th>
+                  <th>Dernière connexion</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="clientBody">
+                <tr><td colspan="7" class="empty-state">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ GUIDE ══ -->
+      <div class="panel" id="panel-guide">
+        <div class="page-title">📖 Guide d'utilisation</div>
+        <div class="page-sub">Tout ce que vous devez savoir pour gérer vos licences</div>
+
+        <div style="display:flex;flex-direction:column;gap:1.5rem;max-width:700px">
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.5rem">
+            <h3 style="color:var(--gold);font-size:0.9rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em">🔐 Comment fonctionne la licence ?</h3>
+            <p style="font-size:0.85rem;color:#aaa;line-height:1.8">
+              Quand un client ouvre <strong style="color:white">CVite Pro</strong>, le logiciel envoie automatiquement
+              sa clé à votre serveur. Le serveur répond en temps réel :<br><br>
+              ✅ <strong style="color:var(--green)">Valide</strong> → accès accordé<br>
+              ❌ <strong style="color:var(--red)">Bloqué</strong> → écran de blocage immédiat<br>
+              ⏰ <strong style="color:var(--orange)">Expiré</strong> → message d'expiration<br>
+              🔑 <strong style="color:var(--muted)">Invalide</strong> → demande de clé
+            </p>
+          </div>
+
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.5rem">
+            <h3 style="color:var(--gold);font-size:0.9rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em">👤 Créer un nouveau client</h3>
+            <ol style="font-size:0.85rem;color:#aaa;line-height:2;padding-left:1.2rem">
+              <li>Cliquez sur <strong style="color:white">＋ Nouveau client</strong></li>
+              <li>Remplissez le nom, email, entreprise</li>
+              <li>Choisissez la durée (ex: 30 jours = 1 mois)</li>
+              <li>Cliquez <strong style="color:white">Créer</strong> → une clé est générée automatiquement</li>
+              <li>Copiez la clé et envoyez-la au client par email</li>
+              <li>Le client saisit la clé au premier lancement</li>
+            </ol>
+          </div>
+
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.5rem">
+            <h3 style="color:var(--red);font-size:0.9rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em">🚫 Bloquer un client (non-paiement…)</h3>
+            <ol style="font-size:0.85rem;color:#aaa;line-height:2;padding-left:1.2rem">
+              <li>Allez dans <strong style="color:white">Clients & Licences</strong></li>
+              <li>Trouvez le client concerné</li>
+              <li>Cliquez <strong style="color:var(--red)">🚫 Bloquer</strong></li>
+              <li>Indiquez une raison (optionnel)</li>
+              <li>Confirmez → <strong style="color:white">le blocage est immédiat</strong></li>
+              <li>Au prochain lancement chez le client → écran rouge de blocage</li>
+            </ol>
+          </div>
+
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.5rem">
+            <h3 style="color:var(--green);font-size:0.9rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em">🔓 Renouveler / Débloquer</h3>
+            <p style="font-size:0.85rem;color:#aaa;line-height:1.8">
+              Utilisez le bouton <strong style="color:var(--green)">📅 Prolonger</strong> pour ajouter des jours.<br>
+              Utilisez <strong style="color:var(--green)">🔓 Débloquer</strong> pour réactiver après un blocage.<br>
+              Utilisez <strong style="color:var(--gold)">🔑 Nouvelle clé</strong> si vous soupçonnez un partage de clé.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TARIFICATION ══ -->
+      <div class="panel" id="panel-pricing">
+        <div class="page-title">💰 Stratégie de tarification</div>
+        <div class="page-sub">Comment vendre CVite Pro à vos clients</div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.2rem;margin-bottom:2rem">
+
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.5rem">
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:0.5rem">Mensuel — Recommandé</div>
+            <div style="font-size:2rem;font-weight:700;color:var(--gold)">15–25 €<span style="font-size:0.9rem;color:var(--muted)">/mois</span></div>
+            <div style="font-size:0.82rem;color:#aaa;line-height:1.7;margin-top:0.75rem">
+              Accès complet<br>Mises à jour incluses<br>Support par email<br>Idéal pour les TPE/PME
+            </div>
+          </div>
+
+          <div style="background:var(--panel);border:2px solid var(--gold);border-radius:14px;padding:1.5rem;position:relative">
+            <div style="position:absolute;top:-10px;left:1rem;background:var(--gold);color:var(--ink);font-size:0.65rem;font-weight:700;padding:0.15rem 0.6rem;border-radius:10px;text-transform:uppercase;letter-spacing:0.05em">⭐ Best-seller</div>
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:0.5rem">Annuel</div>
+            <div style="font-size:2rem;font-weight:700;color:var(--gold)">150–200 €<span style="font-size:0.9rem;color:var(--muted)">/an</span></div>
+            <div style="font-size:0.82rem;color:#aaa;line-height:1.7;margin-top:0.75rem">
+              2 mois offerts<br>Support prioritaire<br>Formation incluse<br>Fidélise le client
+            </div>
+          </div>
+
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.5rem">
+            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:0.5rem">Multi-postes (5 licences)</div>
+            <div style="font-size:2rem;font-weight:700;color:var(--gold)">60–80 €<span style="font-size:0.9rem;color:var(--muted)">/mois</span></div>
+            <div style="font-size:0.82rem;color:#aaa;line-height:1.7;margin-top:0.75rem">
+              5 licences individuelles<br>Tableau de bord commun<br>Pour les agences / RH<br>Meilleure marge
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.5rem;max-width:700px">
+          <h3 style="color:var(--gold);font-size:0.9rem;margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em">📈 Simulation de revenus mensuels</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;font-size:0.83rem">
+            <div>
+              <div style="color:var(--muted);font-size:0.72rem;margin-bottom:0.3rem">5 clients × 20€/mois</div>
+              <div style="color:var(--green);font-size:1.3rem;font-weight:700">100 €/mois</div>
+            </div>
+            <div>
+              <div style="color:var(--muted);font-size:0.72rem;margin-bottom:0.3rem">15 clients × 20€/mois</div>
+              <div style="color:var(--green);font-size:1.3rem;font-weight:700">300 €/mois</div>
+            </div>
+            <div>
+              <div style="color:var(--muted);font-size:0.72rem;margin-bottom:0.3rem">30 clients × 20€/mois</div>
+              <div style="color:var(--green);font-size:1.3rem;font-weight:700">600 €/mois</div>
+            </div>
+          </div>
+          <div style="margin-top:1rem;font-size:0.8rem;color:var(--muted);line-height:1.7">
+            Coût serveur estimé (Render/Railway) : <strong style="color:white">0–7€/mois</strong> selon le trafic.<br>
+            Votre marge nette est donc proche de <strong style="color:var(--green)">100%</strong> une fois le logiciel développé.
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.content -->
+  </div><!-- /.layout -->
+</div><!-- /#app -->
+
+<!-- ══ MODAL CRÉER CLIENT ══ -->
+<div class="modal-bg" id="modalCreate">
+  <div class="modal">
+    <div class="modal-title">＋ Nouveau client</div>
+    <div class="modal-sub">Créez une licence et envoyez la clé au client</div>
+    <div class="form-row-2">
+      <div class="form-row" style="margin-bottom:0"><label>Nom complet *</label><input type="text" id="cName" placeholder="Jean Dupont"></div>
+      <div class="form-row" style="margin-bottom:0"><label>Email *</label><input type="email" id="cEmail" placeholder="jean@entreprise.fr"></div>
+    </div>
+    <div class="form-row"><label>Entreprise</label><input type="text" id="cCompany" placeholder="Nom de l'entreprise (optionnel)"></div>
+    <div class="form-row-2">
+      <div class="form-row" style="margin-bottom:0">
+        <label>Plan</label>
+        <select id="cPlan">
+          <option value="monthly">Mensuel (20€/mois)</option>
+          <option value="yearly">Annuel (180€/an)</option>
+          <option value="multi">Multi-postes (60€/mois)</option>
+          <option value="trial">Essai gratuit</option>
+          <option value="custom">Personnalisé</option>
+        </select>
+      </div>
+      <div class="form-row" style="margin-bottom:0"><label>Durée (jours) *</label><input type="number" id="cDays" placeholder="30" value="30" min="1"></div>
+    </div>
+    <div class="form-row"><label>Notes internes</label><textarea id="cNotes" placeholder="Notes privées sur ce client…"></textarea></div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-gray" onclick="closeModal('create')">Annuler</button>
+      <button class="mbtn mbtn-gold" onclick="createClient()">✓ Créer la licence</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL CLÉ GÉNÉRÉE ══ -->
+<div class="modal-bg" id="modalKey">
+  <div class="modal">
+    <div class="modal-title">✅ Licence créée avec succès !</div>
+    <div class="modal-sub">Envoyez cette clé au client. Elle ne sera plus affichable de cette façon ensuite.</div>
+    <div class="form-row"><label>Client</label><input type="text" id="mkClientName" readonly style="color:var(--gold)"></div>
+    <div class="form-row"><label>🔑 Clé d'activation à envoyer</label>
+      <div class="key-display">
+        <span id="mkKey">—</span>
+        <button class="copy-icon" onclick="copyKey(document.getElementById('mkKey').textContent)">📋</button>
+      </div>
+    </div>
+    <div class="warn-box">⚠️ Notez ou copiez cette clé maintenant. Envoyez-la par email à votre client pour qu'il puisse activer son accès.</div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-gold" onclick="copyKey(document.getElementById('mkKey').textContent);closeModal('key')">📋 Copier et fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL BLOQUER ══ -->
+<div class="modal-bg" id="modalBlock">
+  <div class="modal">
+    <div class="modal-title">🚫 Bloquer le client</div>
+    <div class="modal-sub" id="mbClientName"></div>
+    <div class="warn-box">Dès sa prochaine ouverture de CVite Pro, ce client verra un écran de blocage et ne pourra plus accéder au logiciel.</div>
+    <div class="form-row"><label>Raison du blocage (optionnel)</label>
+      <input type="text" id="mbReason" placeholder="ex: Paiement impayé, Fin de contrat…">
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-gray" onclick="closeModal('block')">Annuler</button>
+      <button class="mbtn mbtn-red" onclick="confirmBlock()">🔒 Confirmer le blocage</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL PROLONGER ══ -->
+<div class="modal-bg" id="modalExtend">
+  <div class="modal">
+    <div class="modal-title">📅 Prolonger la licence</div>
+    <div class="modal-sub" id="meClientName"></div>
+    <div class="form-row"><label>Nombre de jours à ajouter</label>
+      <input type="number" id="meDays" placeholder="30" value="30" min="1">
+    </div>
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">La durée est ajoutée à partir de l'expiration actuelle (ou d'aujourd'hui si déjà expirée).</div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-gray" onclick="closeModal('extend')">Annuler</button>
+      <button class="mbtn mbtn-gold" onclick="confirmExtend()">✓ Prolonger</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL HISTORIQUE ══ -->
+<div class="modal-bg" id="modalEvents">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-title">📋 Historique d'activité</div>
+    <div class="modal-sub" id="mevClientName"></div>
+    <div class="ev-list" id="evList"></div>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-gray" onclick="closeModal('events')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+let TOKEN = null;
+let allClients = [];
+let currentBlockId = null;
+let currentExtendId = null;
+
+// ══ UTILS ══
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+async function api(method, url, body=null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}` }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+function copyKey(k) {
+  navigator.clipboard.writeText(k).then(() => toast('✅ Clé copiée dans le presse-papier'));
+}
+
+// ══ LOGIN ══
+async function doLogin() {
+  const pwd = document.getElementById('loginPwd').value;
+  if (!pwd) return;
+
+  const data = await api('POST', '/api/admin/login', { password: pwd });
+  if (data.ok) {
+    TOKEN = data.token;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    loadStats();
+    loadClients();
+  } else {
+    document.getElementById('loginErr').textContent = '❌ Mot de passe incorrect';
+  }
+}
+
+function logout() {
+  TOKEN = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('loginPwd').value = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') doLogin();
+});
+
+// ══ NAVIGATION ══
+function showPanel(id, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('on'));
+  document.getElementById('panel-'+id).classList.add('on');
+  el.classList.add('on');
+  if (id === 'clients') loadClients();
+  if (id === 'dashboard') loadStats();
+}
+
+// ══ STATS ══
+async function loadStats() {
+  const data = await api('GET', '/api/admin/stats');
+  if (!data.ok) return;
+  const s = data.stats;
+  document.getElementById('sTotal').textContent   = s.total;
+  document.getElementById('sActive').textContent  = s.active;
+  document.getElementById('sBlocked').textContent = s.blocked;
+  document.getElementById('sExpired').textContent = s.expired;
+  document.getElementById('sToday').textContent   = s.checks_today;
+}
+
+// ══ CLIENTS ══
+async function loadClients() {
+  const data = await api('GET', '/api/admin/clients');
+  if (!data.ok) return;
+  allClients = data.clients;
+  renderClients(allClients);
+}
+
+function renderClients(clients) {
+  const tbody = document.getElementById('clientBody');
+  if (!clients.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Aucun client. Créez votre premier client !</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = clients.map(c => {
+    const exp = c.expires_at ? new Date(c.expires_at) : null;
+    const now = new Date();
+    const days = exp ? Math.ceil((exp - now) / 86400000) : null;
+
+    let statusBadge;
+    if (c.blocked) {
+      statusBadge = `<span class="badge b-blocked">🔒 Bloqué</span>`;
+    } else if (exp && now > exp) {
+      statusBadge = `<span class="badge b-expired">⏰ Expiré</span>`;
+    } else if (days !== null && days <= 7) {
+      statusBadge = `<span class="badge b-trial">⚠️ ${days}j restants</span>`;
+    } else {
+      statusBadge = `<span class="badge b-active">✅ Actif</span>`;
+    }
+
+    const expStr = exp
+      ? `${exp.toLocaleDateString('fr-FR')}${days !== null && !c.blocked ? ` <span style="color:${days<=7?'#f39c12':'#666'};font-size:0.72rem">(${days > 0 ? days+'j' : 'expiré'})</span>` : ''}`
+      : '<span style="color:#666">—</span>';
+
+    const lastConn = c.last_check
+      ? new Date(c.last_check).toLocaleDateString('fr-FR') + ' ' + new Date(c.last_check).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})
+      : '<span style="color:#666">Jamais</span>';
+
+    const planLabels = { monthly: 'Mensuel', yearly: 'Annuel', multi: 'Multi', trial: 'Essai', custom: 'Custom' };
+
+    return `
+      <tr>
+        <td>
+          <div class="td-name">${c.name}</div>
+          <div class="td-email">${c.email}${c.company ? ' · '+c.company : ''}</div>
+        </td>
+        <td><span class="td-key">${c.license_key}</span></td>
+        <td><span style="font-size:0.78rem;color:#aaa">${planLabels[c.plan]||c.plan}</span></td>
+        <td>${statusBadge}</td>
+        <td style="font-size:0.8rem">${expStr}</td>
+        <td style="font-size:0.78rem;color:#888">${lastConn}</td>
+        <td>
+          <div class="actions">
+            <button class="ab ab-gold" onclick='copyKey("${c.license_key}")' title="Copier la clé">🔑</button>
+            ${c.blocked
+              ? `<button class="ab ab-green" onclick="unblock('${c.id}')">🔓 Réactiver</button>`
+              : `<button class="ab ab-red" onclick="openBlock('${c.id}','${c.name}')">🚫 Bloquer</button>`}
+            <button class="ab ab-teal" onclick="openExtend('${c.id}','${c.name}')">📅 Prolonger</button>
+            <button class="ab ab-gray" onclick="renewKey('${c.id}','${c.name}')">🔄 Clé</button>
+            <button class="ab ab-gray" onclick="showEvents('${c.id}','${c.name}')">📋</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function filterClients(q) {
+  const lq = q.toLowerCase();
+  renderClients(allClients.filter(c =>
+    c.name.toLowerCase().includes(lq) ||
+    c.email.toLowerCase().includes(lq) ||
+    c.license_key.toLowerCase().includes(lq) ||
+    (c.company||'').toLowerCase().includes(lq)
+  ));
+}
+
+// ══ MODALS ══
+function openModal(id) { document.getElementById('modal'+capitalize(id)).classList.add('open'); }
+function closeModal(id) { document.getElementById('modal'+capitalize(id)).classList.remove('open'); }
+function capitalize(s) { return s[0].toUpperCase() + s.slice(1); }
+
+async function createClient() {
+  const name    = document.getElementById('cName').value.trim();
+  const email   = document.getElementById('cEmail').value.trim();
+  const company = document.getElementById('cCompany').value.trim();
+  const plan    = document.getElementById('cPlan').value;
+  const days    = document.getElementById('cDays').value;
+  const notes   = document.getElementById('cNotes').value.trim();
+
+  if (!name || !email) { toast('Nom et email obligatoires', 'error'); return; }
+
+  const data = await api('POST', '/api/admin/clients', { name, email, company, plan, days, notes });
+  if (data.ok) {
+    closeModal('create');
+    document.getElementById('mkClientName').value = `${data.client.name} — ${data.client.email}`;
+    document.getElementById('mkKey').textContent = data.client.license_key;
+    openModal('key');
+    loadClients(); loadStats();
+    ['cName','cEmail','cCompany','cNotes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('cDays').value = '30';
+    toast('✅ Client créé avec succès !');
+  } else {
+    toast(data.error || 'Erreur lors de la création', 'error');
+  }
+}
+
+function openBlock(id, name) {
+  currentBlockId = id;
+  document.getElementById('mbClientName').textContent = name;
+  document.getElementById('mbReason').value = '';
+  openModal('block');
+}
+
+async function confirmBlock() {
+  const reason = document.getElementById('mbReason').value.trim();
+  const data = await api('PUT', `/api/admin/clients/${currentBlockId}/block`, { reason });
+  if (data.ok) {
+    closeModal('block');
+    loadClients(); loadStats();
+    toast('🔒 ' + data.message);
+  } else {
+    toast(data.error, 'error');
+  }
+}
+
+async function unblock(id) {
+  const data = await api('PUT', `/api/admin/clients/${id}/unblock`, { days: 30 });
+  if (data.ok) { loadClients(); loadStats(); toast('🔓 ' + data.message); }
+  else toast(data.error, 'error');
+}
+
+function openExtend(id, name) {
+  currentExtendId = id;
+  document.getElementById('meClientName').textContent = name;
+  document.getElementById('meDays').value = '30';
+  openModal('extend');
+}
+
+async function confirmExtend() {
+  const days = document.getElementById('meDays').value;
+  const data = await api('PUT', `/api/admin/clients/${currentExtendId}/extend`, { days });
+  if (data.ok) {
+    closeModal('extend');
+    loadClients();
+    toast('📅 ' + data.message);
+  } else {
+    toast(data.error, 'error');
+  }
+}
+
+async function renewKey(id, name) {
+  if (!confirm(`Régénérer la clé de ${name} ?\nL'ancienne clé ne fonctionnera plus.`)) return;
+  const data = await api('PUT', `/api/admin/clients/${id}/renew-key`);
+  if (data.ok) {
+    document.getElementById('mkClientName').value = name;
+    document.getElementById('mkKey').textContent = data.newKey;
+    openModal('key');
+    loadClients();
+    toast('🔑 Nouvelle clé générée');
+  } else {
+    toast(data.error, 'error');
+  }
+}
+
+async function showEvents(id, name) {
+  document.getElementById('mevClientName').textContent = name;
+  const data = await api('GET', `/api/admin/clients/${id}/events`);
+  const list = document.getElementById('evList');
+  if (!data.ok || !data.events.length) {
+    list.innerHTML = '<div style="text-align:center;color:#666;padding:2rem;font-size:0.83rem">Aucune activité enregistrée</div>';
+  } else {
+    const evCls = { check_ok:'ev-check', blocked:'ev-blocked', blocked_attempt:'ev-blocked', expired_attempt:'ev-expired', created:'ev-created', extended:'ev-extended' };
+    const evLabel = { check_ok:'Connexion réussie', blocked:'Licence bloquée', blocked_attempt:'Tentative bloquée', expired_attempt:'Tentative expirée', created:'Licence créée', extended:'Licence prolongée', unblocked:'Débloqué', key_renewed:'Clé régénérée' };
+    list.innerHTML = data.events.map(e => `
+      <div class="ev-item">
+        <div class="ev-dot ${evCls[e.event]||'ev-default'}"></div>
+        <div>
+          <div class="ev-text">${evLabel[e.event]||e.event}${e.detail ? ' — '+e.detail : ''}${e.ip ? ' <span style="color:#555;font-size:0.72rem">('+e.ip+')</span>' : ''}</div>
+          <div class="ev-time">${new Date(e.created_at).toLocaleString('fr-FR')}</div>
+        </div>
+      </div>`).join('');
+  }
+  openModal('events');
+}
+</script>
+</body>
+</html>
