@@ -1,10 +1,3 @@
-/**
- * ╔══════════════════════════════════════════════════════╗
- * ║         CVite Pro — Serveur Principal               ║
- * ║  API REST + Gestion des licences en temps réel      ║
- * ╚══════════════════════════════════════════════════════╝
- */
-
 require('dotenv').config();
 const express      = require('express');
 const path         = require('path');
@@ -12,395 +5,181 @@ const cors         = require('cors');
 const helmet       = require('helmet');
 const rateLimit    = require('express-rate-limit');
 const jwt          = require('jsonwebtoken');
-const bcrypt       = require('bcryptjs');
 const { v4: uuid } = require('uuid');
-const Database     = require('better-sqlite3');
+const { createClient } = require('@supabase/supabase-js');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ══════════════════════════════
-//  BASE DE DONNÉES SQLITE
-// ══════════════════════════════
-const db = new Database(process.env.DB_PATH || './db/cvite.db');
-db.pragma('journal_mode = WAL');
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
 
-// Création des tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS clients (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    email       TEXT UNIQUE NOT NULL,
-    company     TEXT,
-    plan        TEXT DEFAULT 'monthly',
-    status      TEXT DEFAULT 'trial',
-    license_key TEXT UNIQUE NOT NULL,
-    created_at  TEXT DEFAULT (datetime('now')),
-    expires_at  TEXT,
-    blocked     INTEGER DEFAULT 0,
-    block_reason TEXT,
-    last_check  TEXT,
-    last_ip     TEXT,
-    login_count INTEGER DEFAULT 0,
-    notes       TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS license_events (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id   TEXT NOT NULL,
-    event       TEXT NOT NULL,
-    detail      TEXT,
-    ip          TEXT,
-    created_at  TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (client_id) REFERENCES clients(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS admin_sessions (
-    token       TEXT PRIMARY KEY,
-    created_at  TEXT DEFAULT (datetime('now')),
-    expires_at  TEXT NOT NULL
-  );
-`);
-
-// ══════════════════════════════
-//  MIDDLEWARES
-// ══════════════════════════════
-app.use(helmet({
-  contentSecurityPolicy: false, // Désactivé pour servir les fichiers HTML avec scripts inline
-}));
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-}));
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting — protège contre les attaques brute force
-const licLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
-  message: { ok: false, error: 'Trop de tentatives. Réessayez dans 15 minutes.' }
-});
+const licLimiter = rateLimit({ windowMs: 15*60*1000, max: 20 });
+const admLimiter = rateLimit({ windowMs: 15*60*1000, max: 30 });
 
-const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { ok: false, error: 'Trop de requêtes.' }
-});
-
-// ══════════════════════════════
-//  HELPERS
-// ══════════════════════════════
 function genKey() {
-  const seg = () => Math.random().toString(36).substring(2, 7).toUpperCase();
-  return `CVITE-${seg()}-${seg()}-${seg()}`;
+  const s = () => Math.random().toString(36).substring(2,7).toUpperCase();
+  return `CVITE-${s()}-${s()}-${s()}`;
 }
 
-function logEvent(clientId, event, detail = null, ip = null) {
-  db.prepare(`INSERT INTO license_events (client_id, event, detail, ip) VALUES (?,?,?,?)`)
-    .run(clientId, event, detail, ip);
-}
-
-function getClientIp(req) {
+function getIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 }
 
 function requireAdmin(req, res, next) {
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ ok: false, error: 'Non autorisé' });
-  }
-  const token = auth.slice(7);
-  try {
-    jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
-    next();
-  } catch {
-    return res.status(401).json({ ok: false, error: 'Session expirée' });
-  }
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ ok:false, error:'Non autorisé' });
+  try { jwt.verify(auth.slice(7), process.env.JWT_SECRET || 'secret'); next(); }
+  catch { res.status(401).json({ ok:false, error:'Session expirée' }); }
 }
 
-// ══════════════════════════════
-//  SERVIR LES FICHIERS STATIQUES
-// ══════════════════════════════
+async function logEvent(clientId, event, detail=null, ip=null) {
+  await supabase.from('license_events').insert({ client_id:clientId, event, detail, ip });
+}
+
 app.use('/admin', express.static(path.join(__dirname, '../admin')));
 app.use('/', express.static(path.join(__dirname, '../client')));
 
-// ══════════════════════════════════════════════════
-//  API LICENCE — Utilisée par le logiciel client
-// ══════════════════════════════════════════════════
-
-/**
- * POST /api/license/check
- * Vérifie la validité d'une licence en temps réel
- * Appelé à chaque ouverture du logiciel
- */
-app.post('/api/license/check', licLimiter, (req, res) => {
+// ── VÉRIFICATION LICENCE ──
+app.post('/api/license/check', licLimiter, async (req, res) => {
   const { key } = req.body;
-  const ip = getClientIp(req);
+  const ip = getIp(req);
+  if (!key) return res.json({ ok:false, status:'invalid', message:'Clé manquante' });
 
-  if (!key) return res.json({ ok: false, status: 'invalid', message: 'Clé manquante' });
+  const { data: client } = await supabase
+    .from('clients').select('*')
+    .eq('license_key', key.trim().toUpperCase()).single();
 
-  const client = db.prepare(`SELECT * FROM clients WHERE license_key = ?`).get(key.trim().toUpperCase());
+  if (!client) return res.json({ ok:false, status:'invalid', message:'Clé invalide. Vérifiez et réessayez.' });
 
-  if (!client) {
-    return res.json({ ok: false, status: 'invalid', message: 'Clé d\'activation invalide. Vérifiez et réessayez.' });
-  }
+  await supabase.from('clients').update({
+    last_check: new Date().toISOString(), last_ip: ip,
+    login_count: (client.login_count||0)+1
+  }).eq('id', client.id);
 
-  // Mettre à jour dernier check + IP
-  db.prepare(`UPDATE clients SET last_check = datetime('now'), last_ip = ?, login_count = login_count + 1 WHERE id = ?`)
-    .run(ip, client.id);
-
-  // 1. Bloqué ?
   if (client.blocked) {
-    logEvent(client.id, 'blocked_attempt', 'Tentative sur compte bloqué', ip);
-    return res.json({
-      ok: false,
-      status: 'blocked',
-      message: client.block_reason || 'Votre accès a été désactivé par l\'administrateur. Contactez votre prestataire.'
-    });
+    await logEvent(client.id, 'blocked_attempt', null, ip);
+    return res.json({ ok:false, status:'blocked', message: client.block_reason || 'Accès désactivé. Contactez votre prestataire.' });
   }
 
-  // 2. Expiré ?
-  if (client.expires_at) {
-    const exp = new Date(client.expires_at);
-    if (new Date() > exp) {
-      logEvent(client.id, 'expired_attempt', 'Tentative sur licence expirée', ip);
-      return res.json({
-        ok: false,
-        status: 'expired',
-        message: 'Votre licence a expiré. Contactez votre prestataire pour renouveler.'
-      });
-    }
+  if (client.expires_at && new Date() > new Date(client.expires_at)) {
+    await logEvent(client.id, 'expired_attempt', null, ip);
+    return res.json({ ok:false, status:'expired', message:'Licence expirée. Contactez votre prestataire.' });
   }
 
-  // 3. Valide !
-  logEvent(client.id, 'check_ok', null, ip);
-
-  const exp       = client.expires_at ? new Date(client.expires_at) : null;
-  const daysLeft  = exp ? Math.ceil((exp - new Date()) / 86400000) : null;
+  await logEvent(client.id, 'check_ok', null, ip);
+  const exp = client.expires_at ? new Date(client.expires_at) : null;
+  const daysLeft = exp ? Math.ceil((exp - new Date()) / 86400000) : null;
 
   return res.json({
-    ok: true,
-    status: 'active',
-    client: {
-      name:     client.name,
-      company:  client.company,
-      plan:     client.plan,
-      daysLeft: daysLeft,
-      expiresAt: client.expires_at,
-    },
+    ok:true, status:'active',
+    client: { name:client.name, company:client.company, plan:client.plan, daysLeft, expiresAt:client.expires_at },
     message: daysLeft !== null
-      ? (daysLeft <= 7 ? `⚠️ Votre licence expire dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}` : `✅ Licence active — ${daysLeft} jours restants`)
+      ? (daysLeft <= 7 ? `⚠️ Expire dans ${daysLeft} jour(s)` : `✅ Licence active — ${daysLeft} jours restants`)
       : '✅ Licence active'
   });
 });
 
-// ══════════════════════════════════════════
-//  API ADMIN — Protégée par JWT
-// ══════════════════════════════════════════
-
-/**
- * POST /api/admin/login
- * Connexion admin
- */
-app.post('/api/admin/login', adminLimiter, (req, res) => {
-  const { password } = req.body;
-  const adminPwd = process.env.ADMIN_PASSWORD || 'admin123';
-
-  if (password !== adminPwd) {
-    return res.status(401).json({ ok: false, error: 'Mot de passe incorrect' });
-  }
-
-  const token = jwt.sign(
-    { role: 'admin' },
-    process.env.JWT_SECRET || 'fallback_secret',
-    { expiresIn: '8h' }
-  );
-
-  res.json({ ok: true, token });
+// ── LOGIN ADMIN ──
+app.post('/api/admin/login', admLimiter, (req, res) => {
+  if (req.body.password !== (process.env.ADMIN_PASSWORD || 'admin123'))
+    return res.status(401).json({ ok:false, error:'Mot de passe incorrect' });
+  const token = jwt.sign({ role:'admin' }, process.env.JWT_SECRET || 'secret', { expiresIn:'8h' });
+  res.json({ ok:true, token });
 });
 
-/**
- * GET /api/admin/clients
- * Liste tous les clients
- */
-app.get('/api/admin/clients', requireAdmin, (req, res) => {
-  const clients = db.prepare(`
-    SELECT c.*,
-      (SELECT COUNT(*) FROM license_events WHERE client_id = c.id) as event_count,
-      (SELECT created_at FROM license_events WHERE client_id = c.id ORDER BY created_at DESC LIMIT 1) as last_event
-    FROM clients c
-    ORDER BY c.created_at DESC
-  `).all();
-  res.json({ ok: true, clients });
+// ── LISTE CLIENTS ──
+app.get('/api/admin/clients', requireAdmin, async (req, res) => {
+  const { data } = await supabase.from('clients').select('*').order('created_at', { ascending:false });
+  res.json({ ok:true, clients: data||[] });
 });
 
-/**
- * POST /api/admin/clients
- * Créer un nouveau client / licence
- */
-app.post('/api/admin/clients', requireAdmin, (req, res) => {
+// ── CRÉER CLIENT ──
+app.post('/api/admin/clients', requireAdmin, async (req, res) => {
   const { name, email, company, plan, days, notes } = req.body;
-
-  if (!name || !email) {
-    return res.status(400).json({ ok: false, error: 'Nom et email obligatoires' });
-  }
-
+  if (!name || !email) return res.status(400).json({ ok:false, error:'Nom et email obligatoires' });
   const id  = uuid();
   const key = genKey();
-  const exp = days ? new Date(Date.now() + parseInt(days) * 86400000).toISOString() : null;
-
-  try {
-    db.prepare(`
-      INSERT INTO clients (id, name, email, company, plan, status, license_key, expires_at, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, name, email.toLowerCase(), company || null, plan || 'monthly', 'active', key, exp, notes || null);
-
-    logEvent(id, 'created', `Licence créée par admin. Plan: ${plan || 'monthly'}`, null);
-    const client = db.prepare(`SELECT * FROM clients WHERE id = ?`).get(id);
-    res.json({ ok: true, client });
-  } catch (e) {
-    if (e.message.includes('UNIQUE')) {
-      return res.status(400).json({ ok: false, error: 'Cet email est déjà enregistré' });
-    }
-    res.status(500).json({ ok: false, error: 'Erreur serveur' });
-  }
+  const exp = days ? new Date(Date.now() + parseInt(days)*86400000).toISOString() : null;
+  const { data, error } = await supabase.from('clients').insert({
+    id, name, email:email.toLowerCase(), company:company||null,
+    plan:plan||'yearly', status:'active', license_key:key,
+    expires_at:exp, notes:notes||null, blocked:false, login_count:0
+  }).select().single();
+  if (error) return res.status(400).json({ ok:false, error: error.message.includes('unique') ? 'Email déjà enregistré' : 'Erreur serveur' });
+  await logEvent(id, 'created', `Plan: ${plan}`, null);
+  res.json({ ok:true, client:data });
 });
 
-/**
- * PUT /api/admin/clients/:id/block
- * Bloquer un client immédiatement
- */
-app.put('/api/admin/clients/:id/block', requireAdmin, (req, res) => {
-  const { id } = req.params;
+// ── BLOQUER ──
+app.put('/api/admin/clients/:id/block', requireAdmin, async (req, res) => {
   const { reason } = req.body;
-
-  const client = db.prepare(`SELECT * FROM clients WHERE id = ?`).get(id);
-  if (!client) return res.status(404).json({ ok: false, error: 'Client introuvable' });
-
-  db.prepare(`UPDATE clients SET blocked = 1, block_reason = ? WHERE id = ?`)
-    .run(reason || 'Accès révoqué par l\'administrateur', id);
-
-  logEvent(id, 'blocked', reason || 'Bloqué par admin', null);
-  res.json({ ok: true, message: `${client.name} bloqué avec succès` });
+  await supabase.from('clients').update({ blocked:true, block_reason:reason||'Accès révoqué' }).eq('id', req.params.id);
+  await logEvent(req.params.id, 'blocked', reason, null);
+  res.json({ ok:true, message:'Client bloqué' });
 });
 
-/**
- * PUT /api/admin/clients/:id/unblock
- * Débloquer un client
- */
-app.put('/api/admin/clients/:id/unblock', requireAdmin, (req, res) => {
-  const { id } = req.params;
+// ── DÉBLOQUER ──
+app.put('/api/admin/clients/:id/unblock', requireAdmin, async (req, res) => {
+  const exp = req.body.days ? new Date(Date.now() + parseInt(req.body.days)*86400000).toISOString() : null;
+  await supabase.from('clients').update({ blocked:false, block_reason:null, status:'active', ...(exp?{expires_at:exp}:{}) }).eq('id', req.params.id);
+  await logEvent(req.params.id, 'unblocked', null, null);
+  res.json({ ok:true, message:'Client réactivé' });
+});
+
+// ── PROLONGER ──
+app.put('/api/admin/clients/:id/extend', requireAdmin, async (req, res) => {
   const { days } = req.body;
-
-  const client = db.prepare(`SELECT * FROM clients WHERE id = ?`).get(id);
-  if (!client) return res.status(404).json({ ok: false, error: 'Client introuvable' });
-
-  const exp = days
-    ? new Date(Date.now() + parseInt(days) * 86400000).toISOString()
-    : client.expires_at;
-
-  db.prepare(`UPDATE clients SET blocked = 0, block_reason = null, status = 'active', expires_at = ? WHERE id = ?`)
-    .run(exp, id);
-
-  logEvent(id, 'unblocked', `Débloqué par admin. Nouveau délai: ${days || 'inchangé'} jours`, null);
-  res.json({ ok: true, message: `${client.name} réactivé avec succès` });
+  if (!days || parseInt(days)<1) return res.status(400).json({ ok:false, error:'Jours invalide' });
+  const { data:client } = await supabase.from('clients').select('expires_at').eq('id', req.params.id).single();
+  const base = (client?.expires_at && new Date(client.expires_at) > new Date()) ? new Date(client.expires_at) : new Date();
+  const newExp = new Date(base.getTime() + parseInt(days)*86400000).toISOString();
+  await supabase.from('clients').update({ expires_at:newExp, status:'active', blocked:false }).eq('id', req.params.id);
+  await logEvent(req.params.id, 'extended', `+${days} jours`, null);
+  res.json({ ok:true, message:`Prolongé jusqu'au ${new Date(newExp).toLocaleDateString('fr-FR')}` });
 });
 
-/**
- * PUT /api/admin/clients/:id/extend
- * Prolonger une licence
- */
-app.put('/api/admin/clients/:id/extend', requireAdmin, (req, res) => {
-  const { id } = req.params;
-  const { days } = req.body;
-
-  if (!days || parseInt(days) < 1) {
-    return res.status(400).json({ ok: false, error: 'Nombre de jours invalide' });
-  }
-
-  const client = db.prepare(`SELECT * FROM clients WHERE id = ?`).get(id);
-  if (!client) return res.status(404).json({ ok: false, error: 'Client introuvable' });
-
-  // Prolonger depuis maintenant ou depuis l'expiration actuelle si dans le futur
-  const base = (client.expires_at && new Date(client.expires_at) > new Date())
-    ? new Date(client.expires_at)
-    : new Date();
-  const newExp = new Date(base.getTime() + parseInt(days) * 86400000).toISOString();
-
-  db.prepare(`UPDATE clients SET expires_at = ?, status = 'active', blocked = 0 WHERE id = ?`)
-    .run(newExp, id);
-
-  logEvent(id, 'extended', `Prolongé de ${days} jours. Nouvelle expiration: ${newExp}`, null);
-  res.json({ ok: true, message: `Licence prolongée jusqu'au ${new Date(newExp).toLocaleDateString('fr-FR')}` });
-});
-
-/**
- * PUT /api/admin/clients/:id/renew-key
- * Régénérer la clé d'activation
- */
-app.put('/api/admin/clients/:id/renew-key', requireAdmin, (req, res) => {
-  const { id } = req.params;
-
-  const client = db.prepare(`SELECT * FROM clients WHERE id = ?`).get(id);
-  if (!client) return res.status(404).json({ ok: false, error: 'Client introuvable' });
-
+// ── NOUVELLE CLÉ ──
+app.put('/api/admin/clients/:id/renew-key', requireAdmin, async (req, res) => {
   const newKey = genKey();
-  db.prepare(`UPDATE clients SET license_key = ? WHERE id = ?`).run(newKey, id);
-  logEvent(id, 'key_renewed', 'Clé régénérée par admin', null);
-
-  res.json({ ok: true, newKey, message: 'Nouvelle clé générée' });
+  await supabase.from('clients').update({ license_key:newKey }).eq('id', req.params.id);
+  await logEvent(req.params.id, 'key_renewed', null, null);
+  res.json({ ok:true, newKey, message:'Nouvelle clé générée' });
 });
 
-/**
- * DELETE /api/admin/clients/:id
- * Supprimer un client
- */
-app.delete('/api/admin/clients/:id', requireAdmin, (req, res) => {
-  const { id } = req.params;
-  db.prepare(`DELETE FROM license_events WHERE client_id = ?`).run(id);
-  db.prepare(`DELETE FROM clients WHERE id = ?`).run(id);
-  res.json({ ok: true, message: 'Client supprimé' });
+// ── SUPPRIMER ──
+app.delete('/api/admin/clients/:id', requireAdmin, async (req, res) => {
+  await supabase.from('license_events').delete().eq('client_id', req.params.id);
+  await supabase.from('clients').delete().eq('id', req.params.id);
+  res.json({ ok:true, message:'Client supprimé' });
 });
 
-/**
- * GET /api/admin/clients/:id/events
- * Historique d'un client
- */
-app.get('/api/admin/clients/:id/events', requireAdmin, (req, res) => {
-  const events = db.prepare(`
-    SELECT * FROM license_events WHERE client_id = ?
-    ORDER BY created_at DESC LIMIT 100
-  `).all(req.params.id);
-  res.json({ ok: true, events });
+// ── HISTORIQUE ──
+app.get('/api/admin/clients/:id/events', requireAdmin, async (req, res) => {
+  const { data } = await supabase.from('license_events').select('*')
+    .eq('client_id', req.params.id).order('created_at', { ascending:false }).limit(100);
+  res.json({ ok:true, events:data||[] });
 });
 
-/**
- * GET /api/admin/stats
- * Statistiques globales
- */
-app.get('/api/admin/stats', requireAdmin, (req, res) => {
-  const stats = {
-    total:    db.prepare(`SELECT COUNT(*) as n FROM clients`).get().n,
-    active:   db.prepare(`SELECT COUNT(*) as n FROM clients WHERE blocked = 0 AND (expires_at IS NULL OR expires_at > datetime('now'))`).get().n,
-    blocked:  db.prepare(`SELECT COUNT(*) as n FROM clients WHERE blocked = 1`).get().n,
-    expired:  db.prepare(`SELECT COUNT(*) as n FROM clients WHERE blocked = 0 AND expires_at < datetime('now')`).get().n,
-    checks_today: db.prepare(`SELECT COUNT(*) as n FROM license_events WHERE event = 'check_ok' AND created_at > datetime('now', '-1 day')`).get().n,
-  };
-  res.json({ ok: true, stats });
+// ── STATS ──
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+  const { data:clients } = await supabase.from('clients').select('*');
+  const now = new Date();
+  const total   = clients?.length||0;
+  const blocked = clients?.filter(c=>c.blocked).length||0;
+  const expired = clients?.filter(c=>!c.blocked&&c.expires_at&&new Date(c.expires_at)<now).length||0;
+  const active  = total-blocked-expired;
+  const yesterday = new Date(now-86400000).toISOString();
+  const { data:events } = await supabase.from('license_events').select('*').eq('event','check_ok').gte('created_at', yesterday);
+  res.json({ ok:true, stats:{ total, active, blocked, expired, checks_today:events?.length||0 } });
 });
 
-// ══════════════════════════════
-//  DÉMARRAGE
-// ══════════════════════════════
-app.listen(PORT, () => {
-  console.log(`
-  ╔═══════════════════════════════════════╗
-  ║     CVite Pro — Serveur démarré       ║
-  ║     http://localhost:${PORT}             ║
-  ║     Admin : http://localhost:${PORT}/admin ║
-  ╚═══════════════════════════════════════╝
-  `);
-});
-
+app.listen(PORT, () => console.log(`✅ CVite Pro démarré sur le port ${PORT}`));
 module.exports = app;
