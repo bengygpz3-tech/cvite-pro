@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVite Pro — Logiciel CV Professionnel</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #0c0c14;
+  --gold: #c9a84c;
+  --gold2: #f0d98b;
+  --cream: #f7f3ec;
+  --muted: #6b6880;
+  --white: #ffffff;
+  --serif: 'Playfair Display', Georgia, serif;
+  --sans: 'DM Sans', system-ui, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: var(--sans); background: var(--ink); color: var(--white); overflow-x: hidden; }
+
+/* ── NOISE TEXTURE ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 0.4;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 1.2rem 3rem; display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(180deg, rgba(12,12,20,0.95) 0%, transparent 100%);
+  backdrop-filter: blur(12px);
+}
+.nav-logo { font-family: var(--serif); font-size: 1.5rem; font-weight: 700; color: white; text-decoration: none; }
+.nav-logo em { color: var(--gold); font-style: normal; }
+.nav-cta {
+  background: var(--gold); color: var(--ink); border: none; border-radius: 8px;
+  padding: 0.65rem 1.4rem; font-family: var(--sans); font-weight: 700; font-size: 0.85rem;
+  cursor: pointer; text-decoration: none; transition: all 0.2s;
+}
+.nav-cta:hover { background: var(--gold2); transform: translateY(-1px); }
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 8rem 2rem 5rem; position: relative;
+}
+.hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(201,168,76,0.08) 0%, transparent 70%),
+              radial-gradient(ellipse 40% 40% at 20% 80%, rgba(201,168,76,0.05) 0%, transparent 60%);
+}
+.hero-grid {
+  position: absolute; inset: 0; z-index: 0; opacity: 0.04;
+  background-image: linear-gradient(rgba(201,168,76,0.5) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(201,168,76,0.5) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+.hero-content { position: relative; z-index: 1; max-width: 820px; }
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 20px; padding: 0.35rem 1rem; font-size: 0.78rem; font-weight: 700;
+  color: var(--gold); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2rem;
+  animation: fadeUp 0.6s ease both;
+}
+.hero-title {
+  font-family: var(--serif); font-size: clamp(3rem, 7vw, 5.5rem); font-weight: 900;
+  line-height: 1.05; margin-bottom: 1.5rem; letter-spacing: -0.02em;
+  animation: fadeUp 0.6s 0.1s ease both;
+}
+.hero-title em { color: var(--gold); font-style: normal; display: block; }
+.hero-sub {
+  font-size: 1.15rem; color: rgba(255,255,255,0.55); line-height: 1.7; max-width: 560px;
+  margin: 0 auto 2.5rem; font-weight: 300; animation: fadeUp 0.6s 0.2s ease both;
+}
+.hero-btns {
+  display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+  animation: fadeUp 0.6s 0.3s ease both;
+}
+.btn-primary {
+  background: var(--gold); color: var(--ink); border: none; border-radius: 10px;
+  padding: 0.9rem 2rem; font-family: var(--sans); font-weight: 700; font-size: 0.95rem;
+  cursor: pointer; text-decoration: none; transition: all 0.25s; display: inline-flex; align-items: center; gap: 0.5rem;
+}
+.btn-primary:hover { background: var(--gold2); transform: translateY(-2px); box-shadow: 0 12px 40px rgba(201,168,76,0.3); }
+.btn-ghost {
+  background: transparent; color: white; border: 1.5px solid rgba(255,255,255,0.2); border-radius: 10px;
+  padding: 0.9rem 2rem; font-family: var(--sans); font-weight: 700; font-size: 0.95rem;
+  cursor: pointer; text-decoration: none; transition: all 0.25s; display: inline-flex; align-items: center; gap: 0.5rem;
+}
+.btn-ghost:hover { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05); }
+.hero-scroll {
+  position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  font-size: 0.72rem; color: rgba(255,255,255,0.3); letter-spacing: 0.1em; text-transform: uppercase;
+  animation: fadeUp 0.6s 0.5s ease both;
+}
+.scroll-line { width: 1px; height: 40px; background: linear-gradient(180deg, rgba(201,168,76,0.5), transparent); animation: scrollLine 2s ease-in-out infinite; }
+@keyframes scrollLine { 0%,100%{opacity:0.3;transform:scaleY(1)} 50%{opacity:1;transform:scaleY(0.5)} }
+
+/* ── THEMES SHOWCASE ── */
+.section { padding: 6rem 2rem; position: relative; z-index: 1; }
+.section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: var(--gold); margin-bottom: 0.75rem; }
+.section-title { font-family: var(--serif); font-size: clamp(2rem, 4vw, 3rem); font-weight: 700; margin-bottom: 1rem; }
+.section-sub { font-size: 1rem; color: rgba(255,255,255,0.45); max-width: 500px; line-height: 1.7; }
+.container { max-width: 1100px; margin: 0 auto; }
+
+/* THEMES GRID */
+.themes-intro { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; margin-bottom: 4rem; }
+.themes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+.theme-card {
+  border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.07);
+  transition: all 0.3s; cursor: pointer; position: relative;
+}
+.theme-card:hover { transform: translateY(-6px); border-color: rgba(201,168,76,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+.theme-preview { height: 160px; display: flex; flex-direction: column; }
+.tp-header { padding: 0.9rem; flex-shrink: 0; }
+.tp-name { font-size: 0.65rem; font-weight: 700; opacity: 0.5; margin-bottom: 0.2rem; }
+.tp-title { font-size: 0.8rem; font-weight: 700; }
+.tp-sub { font-size: 0.62rem; opacity: 0.6; margin-top: 0.1rem; }
+.tp-body { flex: 1; padding: 0.7rem; display: flex; gap: 0.5rem; }
+.tp-line { height: 4px; border-radius: 2px; margin-bottom: 0.3rem; }
+.theme-name { padding: 0.75rem 1rem; font-size: 0.78rem; font-weight: 700; background: rgba(0,0,0,0.3); }
+
+/* Thème Classique */
+.t-classic .tp-header { background: #1a1a2e; }
+.t-classic .tp-title { color: white; }
+.t-classic .tp-sub { color: #c9a84c; }
+.t-classic .tp-body { background: white; flex-direction: column; }
+.t-classic .tp-line { background: #c9a84c; }
+/* Thème Moderne */
+.t-modern .tp-header { background: linear-gradient(135deg, #0f3460, #16213e); display: grid; grid-template-columns: 40px 1fr; gap: 0.5rem; align-items: center; }
+.t-modern .tp-avatar { width: 32px; height: 32px; border-radius: 50%; background: #0f3460; border: 2px solid #00b4d8; }
+.t-modern .tp-title { color: white; }
+.t-modern .tp-sub { color: #00b4d8; }
+.t-modern .tp-body { background: #0d1b2a; flex-direction: column; }
+.t-modern .tp-line { background: #00b4d8; }
+/* Thème Tech */
+.t-tech .tp-header { background: #0d0d0d; border-bottom: 2px solid #00ff88; }
+.t-tech .tp-title { color: #00ff88; font-family: 'Courier New', monospace; font-size: 0.75rem; }
+.t-tech .tp-sub { color: rgba(255,255,255,0.4); font-family: monospace; font-size: 0.6rem; }
+.t-tech .tp-body { background: #111; flex-direction: column; }
+.t-tech .tp-line { background: #00ff88; border-radius: 0; }
+/* Thème Étudiant */
+.t-student .tp-header { background: linear-gradient(135deg, #6c63ff, #4834d4); }
+.t-student .tp-title { color: white; }
+.t-student .tp-sub { color: rgba(255,255,255,0.7); }
+.t-student .tp-body { background: #f8f7ff; flex-direction: column; }
+.t-student .tp-line { background: #6c63ff; }
+/* Thème Élégant */
+.t-elegant .tp-header { background: #111; border-top: 2px solid #c9a84c; }
+.t-elegant .tp-title { color: white; font-family: Georgia, serif; font-weight: 400; }
+.t-elegant .tp-sub { color: #c9a84c; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.1em; }
+.t-elegant .tp-body { background: #fdfbf7; flex-direction: column; }
+.t-elegant .tp-line { background: linear-gradient(90deg, #c9a84c, #f0d98b); height: 2px; }
+/* Thème Minimaliste */
+.t-minimal .tp-header { background: white; border-bottom: 2px solid #111; }
+.t-minimal .tp-title { color: #111; font-family: Georgia, serif; font-size: 0.9rem; font-weight: 400; }
+.t-minimal .tp-sub { color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.58rem; }
+.t-minimal .tp-body { background: white; flex-direction: column; }
+.t-minimal .tp-line { background: #111; height: 2px; }
+
+/* ── FEATURES ── */
+.features-section { background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; margin-top: 3.5rem; }
+.feat-card {
+  padding: 2rem; border-radius: 16px; border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.02); transition: all 0.3s;
+}
+.feat-card:hover { border-color: rgba(201,168,76,0.2); background: rgba(201,168,76,0.04); transform: translateY(-3px); }
+.feat-icon { font-size: 2rem; margin-bottom: 1rem; display: block; }
+.feat-title { font-family: var(--serif); font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+.feat-desc { font-size: 0.85rem; color: rgba(255,255,255,0.45); line-height: 1.7; }
+
+/* ── PRICING ── */
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 3.5rem; }
+.price-card {
+  border-radius: 18px; padding: 2rem; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03); transition: all 0.3s; position: relative;
+}
+.price-card.featured {
+  border-color: var(--gold); background: rgba(201,168,76,0.06);
+  transform: scale(1.03);
+}
+.price-card:hover { transform: scale(1.02); }
+.price-card.featured:hover { transform: scale(1.05); }
+.price-badge {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  background: var(--gold); color: var(--ink); font-size: 0.65rem; font-weight: 700;
+  padding: 0.2rem 0.8rem; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.price-plan { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 0.5rem; }
+.price-amount { font-family: var(--serif); font-size: 2.8rem; font-weight: 900; color: var(--gold); line-height: 1; }
+.price-period { font-size: 0.82rem; color: var(--muted); }
+.price-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 1.2rem 0; }
+.price-features { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.5rem; }
+.pf { font-size: 0.83rem; color: rgba(255,255,255,0.65); display: flex; align-items: center; gap: 0.5rem; }
+.pf::before { content: '✓'; color: var(--gold); font-weight: 700; flex-shrink: 0; }
+.price-cta {
+  width: 100%; padding: 0.85rem; border: none; border-radius: 10px; font-family: var(--sans);
+  font-weight: 700; font-size: 0.88rem; cursor: pointer; transition: all 0.2s; text-align: center;
+  display: block; text-decoration: none;
+}
+.price-cta-gold { background: var(--gold); color: var(--ink); }
+.price-cta-gold:hover { background: var(--gold2); }
+.price-cta-ghost { background: transparent; color: white; border: 1.5px solid rgba(255,255,255,0.2); }
+.price-cta-ghost:hover { border-color: rgba(255,255,255,0.5); }
+
+/* ── HOW IT WORKS ── */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-top: 3.5rem; position: relative; }
+.steps::before {
+  content: ''; position: absolute; top: 30px; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,168,76,0.3), rgba(201,168,76,0.3), transparent);
+  z-index: 0;
+}
+.step { text-align: center; position: relative; z-index: 1; }
+.step-num {
+  width: 56px; height: 56px; border-radius: 50%; background: rgba(201,168,76,0.1);
+  border: 1.5px solid rgba(201,168,76,0.3); display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1rem; font-family: var(--serif); font-size: 1.3rem; font-weight: 700; color: var(--gold);
+}
+.step-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 0.4rem; }
+.step-desc { font-size: 0.8rem; color: rgba(255,255,255,0.4); line-height: 1.6; }
+
+/* ── CTA SECTION ── */
+.cta-section {
+  text-align: center; padding: 7rem 2rem;
+  background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(201,168,76,0.08) 0%, transparent 70%);
+}
+.cta-title { font-family: var(--serif); font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 900; margin-bottom: 1rem; }
+.cta-sub { font-size: 1rem; color: rgba(255,255,255,0.45); margin-bottom: 2.5rem; }
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid rgba(255,255,255,0.07); padding: 2rem 3rem;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.8rem; color: rgba(255,255,255,0.3);
+}
+.footer-logo { font-family: var(--serif); font-size: 1.1rem; color: white; }
+.footer-logo em { color: var(--gold); font-style: normal; }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  nav { padding: 1rem 1.5rem; }
+  .themes-intro { grid-template-columns: 1fr; gap: 2rem; }
+  .themes-grid { grid-template-columns: 1fr 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .price-card.featured { transform: none; }
+  .steps { grid-template-columns: 1fr 1fr; }
+  .steps::before { display: none; }
+  footer { flex-direction: column; gap: 0.5rem; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">CV<em>ite</em></a>
+  <a href="#tarifs" class="nav-cta">Voir les tarifs →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-badge">✦ Logiciel CV Professionnel</div>
+    <h1 class="hero-title">
+      Créez des CV<br>
+      <em>qui impressionnent.</em>
+    </h1>
+    <p class="hero-sub">CVite Pro donne à vos équipes un outil élégant et puissant pour créer des CV professionnels en quelques minutes. 6 thèmes, export PDF, interface intuitive.</p>
+    <div class="hero-btns">
+      <a href="#tarifs" class="btn-primary">Commencer maintenant →</a>
+      <a href="#fonctionnalites" class="btn-ghost">Voir les fonctionnalités</a>
+    </div>
+  </div>
+  <div class="hero-scroll">
+    <div class="scroll-line"></div>
+    Découvrir
+  </div>
+</section>
+
+<!-- THEMES -->
+<section class="section" id="themes">
+  <div class="container">
+    <div class="themes-intro reveal">
+      <div>
+        <div class="section-label">Thèmes visuels</div>
+        <h2 class="section-title">6 designs<br>professionnels</h2>
+        <p class="section-sub">Du classique au tech, chaque thème est conçu pour mettre en valeur le profil de vos candidats. Changement en un clic.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.75rem">
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1rem;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.07)">
+          <span style="font-size:1.2rem">🎨</span>
+          <div><div style="font-size:0.82rem;font-weight:700">5 couleurs d'accent par thème</div><div style="font-size:0.75rem;color:rgba(255,255,255,0.4)">Personnalisation totale</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1rem;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.07)">
+          <span style="font-size:1.2rem">📐</span>
+          <div><div style="font-size:0.82rem;font-weight:700">1 ou 2 colonnes</div><div style="font-size:0.75rem;color:rgba(255,255,255,0.4)">Adaptable à chaque profil</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1rem;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.07)">
+          <span style="font-size:1.2rem">⚡</span>
+          <div><div style="font-size:0.82rem;font-weight:700">Aperçu en temps réel</div><div style="font-size:0.75rem;color:rgba(255,255,255,0.4)">Chaque modification visible instantanément</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="themes-grid reveal">
+      <div class="theme-card">
+        <div class="theme-preview t-classic">
+          <div class="tp-header"><div class="tp-name">Thème</div><div class="tp-title">Jean Martin</div><div class="tp-sub">Directeur Commercial</div></div>
+          <div class="tp-body"><div style="flex:1"><div class="tp-line" style="width:80%"></div><div class="tp-line" style="width:60%"></div><div class="tp-line" style="width:70%"></div></div></div>
+        </div>
+        <div class="theme-name">⬛ Classique</div>
+      </div>
+      <div class="theme-card">
+        <div class="theme-preview t-modern">
+          <div class="tp-header"><div class="tp-avatar"></div><div><div class="tp-title">Sophie L.</div><div class="tp-sub">Chef de Projet</div></div></div>
+          <div class="tp-body"><div style="flex:1"><div class="tp-line" style="width:90%"></div><div class="tp-line" style="width:65%"></div><div class="tp-line" style="width:75%"></div></div></div>
+        </div>
+        <div class="theme-name">🔵 Moderne</div>
+      </div>
+      <div class="theme-card">
+        <div class="theme-preview t-tech">
+          <div class="tp-header"><div class="tp-name" style="color:rgba(0,255,136,0.4);font-family:monospace">// profil</div><div class="tp-title">Alex Dev</div><div class="tp-sub">Full Stack Developer</div></div>
+          <div class="tp-body"><div style="flex:1"><div class="tp-line" style="width:85%"></div><div class="tp-line" style="width:55%"></div><div class="tp-line" style="width:70%"></div></div></div>
+        </div>
+        <div class="theme-name">💚 Tech</div>
+      </div>
+      <div class="theme-card">
+        <div class="theme-preview t-student">
+          <div class="tp-header"><div class="tp-title">Emma B.</div><div class="tp-sub">Étudiante en Marketing</div></div>
+          <div class="tp-body"><div style="flex:1"><div class="tp-line" style="width:88%"></div><div class="tp-line" style="width:62%"></div><div class="tp-line" style="width:75%"></div></div></div>
+        </div>
+        <div class="theme-name">💜 Étudiant</div>
+      </div>
+      <div class="theme-card">
+        <div class="theme-preview t-elegant">
+          <div class="tp-header"><div class="tp-title">Pierre Moreau</div><div class="tp-sub">Directeur Général</div></div>
+          <div class="tp-body"><div style="flex:1"><div class="tp-line" style="width:80%"></div><div class="tp-line" style="width:58%"></div><div class="tp-line" style="width:72%"></div></div></div>
+        </div>
+        <div class="theme-name">✨ Élégant</div>
+      </div>
+      <div class="theme-card">
+        <div class="theme-preview t-minimal">
+          <div class="tp-header"><div class="tp-title">Claire V.</div><div class="tp-sub" style="color:#aaa;text-transform:uppercase;font-size:0.58rem;letter-spacing:0.08em">Designer UX</div></div>
+          <div class="tp-body"><div style="flex:1"><div class="tp-line" style="width:75%"></div><div class="tp-line" style="width:55%"></div><div class="tp-line" style="width:65%"></div></div></div>
+        </div>
+        <div class="theme-name">⬜ Minimaliste</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section features-section" id="fonctionnalites">
+  <div class="container">
+    <div class="reveal" style="text-align:center;max-width:560px;margin:0 auto">
+      <div class="section-label">Fonctionnalités</div>
+      <h2 class="section-title">Tout ce dont vous avez besoin</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feat-card reveal">
+        <span class="feat-icon">🎨</span>
+        <div class="feat-title">6 thèmes professionnels</div>
+        <div class="feat-desc">Classique, Moderne, Tech, Étudiant, Élégant, Minimaliste. Chaque thème avec 5 couleurs d'accent.</div>
+      </div>
+      <div class="feat-card reveal">
+        <span class="feat-icon">⚡</span>
+        <div class="feat-title">Aperçu en temps réel</div>
+        <div class="feat-desc">Chaque modification s'affiche instantanément. Pas besoin de recharger la page.</div>
+      </div>
+      <div class="feat-card reveal">
+        <span class="feat-icon">📄</span>
+        <div class="feat-title">Export PDF</div>
+        <div class="feat-desc">Exportez en PDF en un clic via l'impression navigateur. Compatible tous formats.</div>
+      </div>
+      <div class="feat-card reveal">
+        <span class="feat-icon">🔒</span>
+        <div class="feat-title">Licences sécurisées</div>
+        <div class="feat-desc">Chaque utilisateur a une clé unique. Blocage à distance instantané si besoin.</div>
+      </div>
+      <div class="feat-card reveal">
+        <span class="feat-icon">📐</span>
+        <div class="feat-title">Mise en page flexible</div>
+        <div class="feat-desc">1 ou 2 colonnes. Sections activables/désactivables selon le profil.</div>
+      </div>
+      <div class="feat-card reveal">
+        <span class="feat-icon">🌐</span>
+        <div class="feat-title">100% en ligne</div>
+        <div class="feat-desc">Aucune installation. Fonctionne sur tous les navigateurs depuis n'importe quel ordinateur.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section">
+  <div class="container">
+    <div class="reveal" style="text-align:center;max-width:560px;margin:0 auto">
+      <div class="section-label">Comment ça marche</div>
+      <h2 class="section-title">Simple comme bonjour</h2>
+    </div>
+    <div class="steps reveal">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-title">Vous commandez</div>
+        <div class="step-desc">Choisissez votre formule et contactez-nous</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-title">Vous recevez votre clé</div>
+        <div class="step-desc">Une clé d'activation unique par email sous 24h</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-title">Vous activez</div>
+        <div class="step-desc">Entrez la clé sur le logiciel et accédez immédiatement</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-title">Vous créez</div>
+        <div class="step-desc">Créez des CV professionnels en quelques minutes</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section" id="tarifs">
+  <div class="container">
+    <div class="reveal" style="text-align:center;max-width:560px;margin:0 auto">
+      <div class="section-label">Tarification</div>
+      <h2 class="section-title">Simple et transparent</h2>
+      <p class="section-sub" style="margin:0 auto">Sans engagement caché. Sans frais cachés.</p>
+    </div>
+    <div class="pricing-grid reveal">
+      <div class="price-card">
+        <div class="price-plan">Mensuel</div>
+        <div class="price-amount">20€</div>
+        <div class="price-period">par mois</div>
+        <div class="price-divider"></div>
+        <div class="price-features">
+          <div class="pf">Accès complet au logiciel</div>
+          <div class="pf">6 thèmes professionnels</div>
+          <div class="pf">Export PDF illimité</div>
+          <div class="pf">Support par email</div>
+        </div>
+        <a href="#contact" class="price-cta price-cta-ghost">Commencer →</a>
+      </div>
+      <div class="price-card featured">
+        <div class="price-badge">⭐ Meilleure offre</div>
+        <div class="price-plan">Annuel</div>
+        <div class="price-amount">150€</div>
+        <div class="price-period">par an — 2 mois offerts</div>
+        <div class="price-divider"></div>
+        <div class="price-features">
+          <div class="pf">Tout du plan mensuel</div>
+          <div class="pf">2 mois offerts</div>
+          <div class="pf">Support prioritaire</div>
+          <div class="pf">Mises à jour incluses</div>
+        </div>
+        <a href="#contact" class="price-cta price-cta-gold">Choisir ce plan →</a>
+      </div>
+      <div class="price-card">
+        <div class="price-plan">Multi-postes</div>
+        <div class="price-amount">60€</div>
+        <div class="price-period">par mois — 5 licences</div>
+        <div class="price-divider"></div>
+        <div class="price-features">
+          <div class="pf">5 comptes individuels</div>
+          <div class="pf">Idéal pour les équipes</div>
+          <div class="pf">Gestion centralisée</div>
+          <div class="pf">Support dédié</div>
+        </div>
+        <a href="#contact" class="price-cta price-cta-ghost">Nous contacter →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="contact">
+  <div class="container">
+    <div class="reveal">
+      <h2 class="cta-title">Prêt à commencer ?</h2>
+      <p class="cta-sub">Contactez-nous pour obtenir votre accès sous 24h</p>
+      <a href="mailto:votre@email.fr" class="btn-primary" style="font-size:1rem;padding:1rem 2.5rem">
+        ✉️ Nous contacter
+      </a>
+      <p style="margin-top:1.2rem;font-size:0.8rem;color:rgba(255,255,255,0.25)">Réponse garantie sous 24h</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">CV<em>ite</em> Pro</div>
+  <div>© 2024 CVite Pro — Tous droits réservés</div>
+</footer>
+
+<script>
+// Reveal on scroll
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) {
+      setTimeout(() => entry.target.classList.add('visible'), i * 80);
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1 });
+reveals.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
