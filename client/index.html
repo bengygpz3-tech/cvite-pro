@@ -1,186 +1,519 @@
-require('dotenv').config();
-const express      = require('express');
-const path         = require('path');
-const cors         = require('cors');
-const helmet       = require('helmet');
-const rateLimit    = require('express-rate-limit');
-const jwt          = require('jsonwebtoken');
-const { v4: uuid } = require('uuid');
-const { createClient } = require('@supabase/supabase-js');
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVite Pro</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#1a1a2e;--cream:#f7f4ef;--gold:#c9a84c;--rust:#c0392b;--mist:#e8e4dd;--paper:#fdfbf7;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;--serif:Georgia,'Times New Roman',serif}
+#splash{position:fixed;inset:0;background:#09091a;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1.5rem;transition:opacity 0.4s}
+#splash.fade{opacity:0;pointer-events:none}
+.splash-logo{font-family:var(--serif);font-size:2.5rem;font-weight:700;color:white}
+.splash-logo em{color:var(--gold);font-style:normal}
+.splash-spin{width:36px;height:36px;border:3px solid rgba(201,168,76,0.2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lock-screen{position:fixed;inset:0;background:#09091a;z-index:9998;display:none;align-items:center;justify-content:center}
+.lock-screen.show{display:flex}
+.lock-card{background:#14142a;border:1px solid #2a2a4a;border-radius:20px;padding:2.8rem 2.4rem;max-width:420px;width:92%;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,0.7)}
+.lc-logo{font-family:var(--serif);font-size:1.8rem;font-weight:700;color:white}
+.lc-logo em{color:var(--gold);font-style:normal}
+.lc-icon{font-size:3.2rem;display:block;margin:1rem 0 0.75rem}
+.lc-title{font-family:var(--serif);font-size:1.4rem;color:white;margin-bottom:0.4rem}
+.lc-sub{color:#555;font-size:0.83rem;line-height:1.6;margin-bottom:1.6rem;font-family:var(--font)}
+.lc-input{width:100%;padding:0.9rem;background:#09091a;border:1.5px solid #2a2a4a;border-radius:10px;color:white;font-size:1rem;font-family:var(--font);text-align:center;letter-spacing:0.15em;margin-bottom:0.75rem;transition:border-color 0.2s}
+.lc-input:focus{outline:none;border-color:var(--gold)}
+.lc-btn{width:100%;padding:0.9rem;background:var(--gold);border:none;border-radius:10px;font-family:var(--font);font-weight:700;font-size:0.95rem;cursor:pointer;color:#14142a;transition:all 0.2s;margin-bottom:0.6rem}
+.lc-btn:hover{background:#b8943d}
+.lc-msg{font-size:0.8rem;font-family:var(--font);min-height:1.1rem;color:#e74c3c}
+.blocked-screen{position:fixed;inset:0;background:#120606;z-index:9998;display:none;align-items:center;justify-content:center}
+.blocked-screen.show{display:flex}
+.blocked-card{background:#1a0a0a;border:1px solid #5a1515;border-radius:20px;padding:2.8rem 2.4rem;max-width:420px;width:92%;text-align:center}
+.bc-title{font-family:var(--serif);font-size:1.6rem;color:#e74c3c;margin:0.75rem 0 0.5rem}
+.bc-text{color:#888;font-size:0.86rem;line-height:1.7;font-family:var(--font)}
+#licBanner{font-family:var(--font);font-size:0.78rem;padding:0.46rem 1.5rem;display:none;align-items:center;justify-content:space-between}
+#licBanner.show{display:flex}
+#licBanner.ok{background:#071a07;color:#6ec96e;border-bottom:1px solid #1a3a1a}
+#licBanner.warn{background:#1a0e00;color:#ffaa44;border-bottom:1px solid #3a2200}
+#licBanner.crit{background:#1a0000;color:#ff7777;border-bottom:1px solid #5a0000}
+body{font-family:var(--font);background:var(--cream);color:var(--ink);min-height:100vh;display:flex;flex-direction:column}
+header{background:var(--ink);color:var(--cream);padding:0.78rem 1.8rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px rgba(26,26,46,0.3)}
+.logo{font-family:var(--serif);font-size:1.6rem;font-weight:700;color:white}
+.logo em{color:var(--gold);font-style:normal}
+.logo sup{font-family:var(--font);font-size:0.5rem;background:var(--gold);color:var(--ink);padding:0.1rem 0.4rem;border-radius:4px;font-weight:700;vertical-align:super}
+.hbtns{display:flex;gap:0.5rem}
+.hbtn{font-family:var(--font);font-size:0.8rem;font-weight:700;padding:0.55rem 1rem;border:none;border-radius:8px;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:0.32rem}
+.hbtn-ghost{background:transparent;color:var(--cream);border:1.5px solid rgba(255,255,255,0.2)}
+.hbtn-ghost:hover{background:rgba(255,255,255,0.1)}
+.hbtn-gold{background:var(--gold);color:var(--ink)}
+.hbtn-gold:hover{background:#b8943d;transform:translateY(-1px)}
+.app{display:grid;grid-template-columns:385px 1fr;flex:1;height:calc(100vh - 94px);overflow:hidden}
+.sidebar{background:var(--paper);border-right:1px solid var(--mist);overflow-y:auto;display:flex;flex-direction:column}
+.stabs{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--mist);position:sticky;top:0;background:var(--paper);z-index:10}
+.stab{padding:0.8rem 0.4rem;border:none;background:transparent;cursor:pointer;font-family:var(--font);font-size:0.7rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#aaa;transition:all 0.2s;border-bottom:2.5px solid transparent}
+.stab.on{color:var(--ink);border-bottom-color:var(--gold)}
+.spanel{display:none;padding:1.3rem;flex-direction:column;gap:0.92rem}
+.spanel.on{display:flex}
+.fg{display:flex;flex-direction:column;gap:0.3rem}
+.fg label{font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#999}
+input[type=text],input[type=email],input[type=tel],textarea,select{font-family:var(--font);font-size:0.86rem;border:1.5px solid var(--mist);border-radius:8px;padding:0.56rem 0.76rem;background:white;color:var(--ink);transition:border-color 0.2s,box-shadow 0.2s;width:100%}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,0.12)}
+textarea{resize:vertical;min-height:70px}
+.sec-ttl{font-family:var(--serif);font-size:0.9rem;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:0.4rem;padding-bottom:0.4rem;border-bottom:1px solid var(--mist)}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:0.58rem}
+.ecard{background:white;border:1.5px solid var(--mist);border-radius:10px;padding:0.86rem;display:flex;flex-direction:column;gap:0.6rem;animation:fadeUp 0.22s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.ecard-head{display:flex;justify-content:space-between;align-items:center}
+.ecard-lbl{font-weight:700;font-size:0.82rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:185px}
+.dbtn{background:transparent;color:var(--rust);border:1.5px solid #f0b8b2;padding:0.28rem 0.6rem;font-size:0.72rem;font-family:var(--font);font-weight:700;border-radius:7px;cursor:pointer;transition:all 0.2s}
+.dbtn:hover{background:#fdf0ee}
+.chips{display:flex;flex-wrap:wrap;gap:0.38rem;min-height:26px}
+.chip{background:var(--ink);color:var(--cream);border-radius:20px;padding:0.23rem 0.68rem;font-size:0.75rem;display:flex;align-items:center;gap:0.27rem}
+.chip .x{background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;font-size:0.88rem;padding:0;line-height:1}
+.skill-add{display:flex;gap:0.38rem}
+.skill-add input{flex:1}
+.slvl{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem}
+.slvl-name{font-size:0.74rem;min-width:102px;max-width:102px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slvl-range{flex:1;accent-color:var(--gold)}
+.slvl-val{font-size:0.71rem;font-weight:700;color:var(--gold);min-width:28px;text-align:right}
+.photo-zone{border:2px dashed var(--mist);border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden}
+.photo-zone:hover{border-color:var(--gold);background:rgba(201,168,76,0.04)}
+.photo-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+#photoPreview{width:74px;height:74px;border-radius:50%;object-fit:cover;border:3px solid var(--gold);display:none;margin:0 auto 0.3rem}
+.photo-ph{font-size:2rem;color:#d0ccc5}
+.theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem}
+.topt{border:2px solid var(--mist);border-radius:10px;padding:0.7rem 0.35rem;text-align:center;cursor:pointer;transition:all 0.2s;font-size:0.72rem;font-weight:700;color:#888}
+.topt:hover{border-color:#ccc;transform:translateY(-1px)}
+.topt.on{border-color:var(--gold);background:rgba(201,168,76,0.08);color:var(--ink)}
+.tdot{width:24px;height:24px;border-radius:50%;margin:0 auto 0.35rem;border:2px solid rgba(0,0,0,0.1)}
+.color-grid{display:flex;gap:0.5rem;flex-wrap:wrap}
+.copt{width:30px;height:30px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.2s;flex-shrink:0}
+.copt:hover{transform:scale(1.15)}
+.copt.on{border-color:var(--ink);transform:scale(1.15);box-shadow:0 0 0 2px white,0 0 0 4px var(--ink)}
+.add-row{width:100%;border:1.5px dashed var(--mist);background:transparent;color:#aaa;cursor:pointer;padding:0.6rem;border-radius:8px;font-family:var(--font);font-size:0.78rem;font-weight:700;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:0.3rem}
+.add-row:hover{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,0.04)}
+.sbtn{font-family:var(--font);font-size:0.76rem;font-weight:700;padding:0.34rem 0.72rem;border:none;border-radius:7px;cursor:pointer;transition:all 0.2s}
+.sbtn-gold{background:var(--gold);color:var(--ink)}
+.sbtn-gray{background:#f0ebe2;color:#666}
+.preview{background:#c0bdb7;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:1.4rem;gap:1rem}
+.prev-bar{display:flex;gap:0.5rem;align-items:center;background:white;padding:0.62rem 1.1rem;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.1);position:sticky;top:0;z-index:10;width:100%;max-width:770px;justify-content:space-between}
+.prev-lbl{font-size:0.78rem;font-weight:700;color:#888}
+.cvp{width:100%;max-width:770px;background:white;box-shadow:0 8px 40px rgba(0,0,0,0.2);border-radius:3px;overflow:hidden}
+.cv-empty{font-size:0.77rem;color:#d5d0c8;font-style:italic;padding:0.3rem 0}
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+/* CLASSIQUE */
+.tc .hd{background:var(--tp,#1a1a2e);color:white;padding:1.85rem 2.4rem 1.55rem;display:grid;grid-template-columns:1fr auto;gap:1.3rem;align-items:center}
+.tc .nm{font-family:var(--serif);font-size:1.95rem;font-weight:700;letter-spacing:-0.02em;line-height:1.05}
+.tc .jt{font-size:0.92rem;color:var(--ta,#c9a84c);font-weight:400;margin-top:0.18rem}
+.tc .cts{margin-top:0.8rem;display:flex;flex-wrap:wrap;gap:0.2rem 1.1rem}
+.tc .ci{font-size:0.73rem;color:rgba(255,255,255,0.55)}
+.tc .ph{width:82px;height:82px;border-radius:50%;object-fit:cover;border:3px solid var(--ta,#c9a84c);flex-shrink:0}
+.tc .bd{padding:1.7rem 2.4rem;display:grid;gap:2.2rem}
+.tc .bd.col1{grid-template-columns:1fr}
+.tc .bd.col2{grid-template-columns:1fr 190px}
+.tc .sc{margin-bottom:1.35rem}.tc .sc:last-child{margin-bottom:0}
+.tc .sh{font-size:0.64rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--tp,#1a1a2e);border-bottom:2px solid var(--ta,#c9a84c);padding-bottom:0.25rem;margin-bottom:0.8rem}
+.tc .sm{font-size:0.81rem;color:#444;line-height:1.68;font-style:italic}
+.tc .ei{margin-bottom:0.92rem;padding-bottom:0.92rem;border-bottom:1px solid #f2ede5}.tc .ei:last-child{border:none;margin-bottom:0;padding-bottom:0}
+.tc .er{display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem}
+.tc .et{font-weight:700;font-size:0.86rem}.tc .ed{font-size:0.71rem;color:var(--ta,#c9a84c);font-weight:700;white-space:nowrap;flex-shrink:0}
+.tc .ec{font-size:0.79rem;color:#555;font-weight:500;margin-top:0.06rem}.tc .ex{font-size:0.77rem;color:#666;margin-top:0.28rem;line-height:1.62}
+.tc .sb{margin-bottom:0.48rem}.tc .sbn{font-size:0.75rem;margin-bottom:0.16rem;font-weight:500}
+.tc .sbb{background:#ebe6dc;border-radius:99px;height:5px}.tc .sbf{height:5px;border-radius:99px;background:linear-gradient(90deg,var(--ta,#c9a84c),var(--ta2,#e8c85a))}
+.tc .tg{display:inline-block;background:#f5f0e5;color:#666;border-radius:4px;padding:0.12rem 0.45rem;font-size:0.72rem;margin:0.09rem 0.07rem 0 0}
+.tc .li{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.38rem}
+.tc .ln{font-size:0.78rem;font-weight:700}.tc .ll{font-size:0.71rem;color:#aaa}
+.tc .xi{font-size:0.77rem;color:#555;margin-bottom:0.24rem;display:flex;gap:0.32rem}.tc .xi::before{content:'▸';color:var(--ta,#c9a84c);flex-shrink:0}
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+/* MODERNE */
+.tm .hd{display:grid;grid-template-columns:190px 1fr}
+.tm .hs{background:var(--td,#16213e);padding:1.85rem 1.3rem;display:flex;flex-direction:column;align-items:center;gap:0.85rem}
+.tm .ph{width:94px;height:94px;border-radius:50%;object-fit:cover;border:4px solid var(--ta,#00b4d8)}
+.tm .ph-ph{width:94px;height:94px;border-radius:50%;background:var(--tp,#0f3460);border:3px solid var(--ta,#00b4d8);display:flex;align-items:center;justify-content:center;font-size:2.1rem}
+.tm .hm{background:var(--tp,#0f3460);color:white;padding:1.85rem 1.7rem;display:flex;flex-direction:column;justify-content:center}
+.tm .nm{font-family:var(--serif);font-size:1.9rem;font-weight:700;line-height:1.06}
+.tm .jt{color:var(--ta,#00b4d8);font-weight:700;font-size:0.92rem;margin-top:0.25rem}
+.tm .cts{margin-top:0.88rem;display:flex;flex-direction:column;gap:0.25rem}
+.tm .ci{font-size:0.74rem;color:rgba(255,255,255,0.6)}
+.tm .bd{display:grid}
+.tm .bd.col1{grid-template-columns:1fr}
+.tm .bd.col2{grid-template-columns:190px 1fr}
+.tm .bl{background:var(--td,#16213e);color:white;padding:1.55rem 1.3rem}
+.tm .br{padding:1.55rem 1.7rem}
+.tm .sc{margin-bottom:1.35rem}.tm .sc:last-child{margin-bottom:0}
+.tm .sh{font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--ta,#00b4d8);border-bottom:1px solid rgba(0,180,216,0.2);padding-bottom:0.24rem;margin-bottom:0.78rem}
+.tm .sm{font-size:0.81rem;color:#444;line-height:1.68;font-style:italic}
+.tm .ei{margin-bottom:0.9rem;padding-left:0.95rem;position:relative}
+.tm .ei::before{content:'';position:absolute;left:0;top:6px;width:6px;height:6px;border-radius:50%;background:var(--ta,#00b4d8)}
+.tm .er{display:flex;justify-content:space-between;gap:0.5rem;align-items:flex-start}
+.tm .et{font-weight:700;font-size:0.85rem}.tm .ed{font-size:0.7rem;color:var(--ta,#00b4d8);font-weight:700;white-space:nowrap;flex-shrink:0}
+.tm .ec{font-size:0.78rem;color:#555;font-weight:500}.tm .ex{font-size:0.76rem;color:#666;margin-top:0.26rem;line-height:1.6}
+.tm .sb{margin-bottom:0.46rem}.tm .sbn{font-size:0.73rem;color:rgba(255,255,255,0.78);margin-bottom:0.16rem}
+.tm .sbb{background:rgba(255,255,255,0.1);border-radius:99px;height:4px}.tm .sbf{height:4px;border-radius:99px;background:linear-gradient(90deg,var(--ta,#00b4d8),var(--ta2,#48cae4))}
+.tm .tg{display:inline-block;background:rgba(0,180,216,0.12);color:var(--ta,#00b4d8);border-radius:4px;padding:0.12rem 0.45rem;font-size:0.72rem;margin:0.09rem 0.07rem 0 0;font-weight:700}
+.tm .li{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.38rem}
+.tm .ln{font-size:0.77rem;font-weight:700;color:rgba(255,255,255,0.85)}.tm .ll{font-size:0.7rem;color:rgba(255,255,255,0.38)}
+.tm .xi{font-size:0.75rem;color:rgba(255,255,255,0.65);margin-bottom:0.24rem;display:flex;gap:0.32rem}.tm .xi::before{content:'✦';color:var(--ta,#00b4d8);font-size:0.56rem;flex-shrink:0;position:relative;top:0.1em}
 
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: '*' }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+/* MINIMALISTE */
+.tmin .hd{padding:2.6rem 3rem 1.65rem;border-bottom:2px solid #111;display:grid;grid-template-columns:1fr auto;gap:1.8rem;align-items:start}
+.tmin .nm{font-family:var(--serif);font-size:2.35rem;font-weight:400;letter-spacing:-0.04em;color:#111;line-height:1}
+.tmin .jt{font-size:0.82rem;color:var(--ta,#aaa);font-weight:400;margin-top:0.4rem;text-transform:uppercase;letter-spacing:0.1em}
+.tmin .cts{margin-top:0.88rem;display:flex;gap:1.2rem;flex-wrap:wrap}
+.tmin .ci{font-size:0.73rem;color:#bbb}
+.tmin .ph{width:68px;height:68px;border-radius:4px;object-fit:cover}
+.tmin .bd{padding:2rem 3rem;display:grid;gap:2.6rem}
+.tmin .bd.col1{grid-template-columns:1fr}
+.tmin .bd.col2{grid-template-columns:1fr 180px}
+.tmin .sc{margin-bottom:1.8rem}.tmin .sc:last-child{margin-bottom:0}
+.tmin .sh{font-size:0.62rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--ta,#ccc);margin-bottom:0.88rem}
+.tmin .sm{font-size:0.81rem;color:#555;line-height:1.72}
+.tmin .ei{margin-bottom:1.05rem;padding-bottom:1.05rem;border-bottom:1px solid #f0f0f0}.tmin .ei:last-child{border:none;margin-bottom:0;padding-bottom:0}
+.tmin .er{display:flex;justify-content:space-between;gap:0.5rem}
+.tmin .et{font-weight:700;font-size:0.85rem;color:#111}.tmin .ed{font-size:0.71rem;color:#ccc;white-space:nowrap;flex-shrink:0}
+.tmin .ec{font-size:0.79rem;color:#888;margin-top:0.06rem}.tmin .ex{font-size:0.77rem;color:#666;margin-top:0.26rem;line-height:1.62}
+.tmin .tg{display:inline-block;background:#f4f4f4;color:#777;border-radius:3px;padding:0.12rem 0.45rem;font-size:0.72rem;margin:0.09rem 0.07rem 0 0}
+.tmin .sb{margin-bottom:0.46rem}.tmin .sbn{font-size:0.75rem;color:#555;margin-bottom:0.16rem}
+.tmin .sbb{background:#ebebeb;border-radius:99px;height:3px}.tmin .sbf{height:3px;border-radius:99px;background:var(--ta,#111)}
+.tmin .li{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.38rem}
+.tmin .ln{font-size:0.77rem;font-weight:700;color:#333}.tmin .ll{font-size:0.7rem;color:#ccc}
+.tmin .xi{font-size:0.76rem;color:#666;margin-bottom:0.24rem}
 
-const licLimiter = rateLimit({ windowMs: 15*60*1000, max: 20 });
-const admLimiter = rateLimit({ windowMs: 15*60*1000, max: 30 });
+/* ETUDIANT */
+.tetu .hd{background:linear-gradient(135deg,var(--tp,#6c63ff),var(--td,#4834d4));color:white;padding:2rem 2.4rem;display:grid;grid-template-columns:1fr auto;gap:1.3rem;align-items:center}
+.tetu .nm{font-family:var(--serif);font-size:1.9rem;font-weight:700;line-height:1.05}
+.tetu .jt{font-size:0.9rem;color:rgba(255,255,255,0.8);margin-top:0.2rem}
+.tetu .cts{margin-top:0.8rem;display:flex;flex-wrap:wrap;gap:0.5rem}
+.tetu .ci{font-size:0.72rem;color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.15);padding:0.2rem 0.6rem;border-radius:20px}
+.tetu .ph{width:80px;height:80px;border-radius:12px;object-fit:cover;border:3px solid rgba(255,255,255,0.4);flex-shrink:0}
+.tetu .bd{padding:1.6rem 2.4rem;display:grid;gap:2rem}
+.tetu .bd.col1{grid-template-columns:1fr}
+.tetu .bd.col2{grid-template-columns:1fr 185px}
+.tetu .sc{margin-bottom:1.3rem}.tetu .sc:last-child{margin-bottom:0}
+.tetu .sh{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:white;background:var(--tp,#6c63ff);padding:0.3rem 0.8rem;border-radius:5px;display:inline-block;margin-bottom:0.85rem}
+.tetu .sm{font-size:0.81rem;color:#555;line-height:1.68}
+.tetu .ei{margin-bottom:0.9rem;padding:0.7rem;background:#f8f7ff;border-radius:8px;border-left:3px solid var(--tp,#6c63ff)}
+.tetu .er{display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem}
+.tetu .et{font-weight:700;font-size:0.85rem;color:var(--tp,#6c63ff)}.tetu .ed{font-size:0.71rem;color:#999;white-space:nowrap;flex-shrink:0}
+.tetu .ec{font-size:0.78rem;color:#666;font-weight:500}.tetu .ex{font-size:0.76rem;color:#666;margin-top:0.26rem;line-height:1.6}
+.tetu .sb{margin-bottom:0.46rem}.tetu .sbn{font-size:0.74rem;color:#555;margin-bottom:0.16rem}
+.tetu .sbb{background:#ebe8ff;border-radius:99px;height:6px}.tetu .sbf{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--tp,#6c63ff),var(--ta,#a29bfe))}
+.tetu .tg{display:inline-block;background:#ebe8ff;color:var(--tp,#6c63ff);border-radius:20px;padding:0.15rem 0.55rem;font-size:0.73rem;margin:0.09rem 0.07rem 0 0;font-weight:700}
+.tetu .li{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.4rem}
+.tetu .ln{font-size:0.78rem;font-weight:700;color:#333}.tetu .ll{font-size:0.71rem;color:#aaa}
+.tetu .xi{font-size:0.77rem;color:#555;margin-bottom:0.25rem;display:flex;gap:0.32rem}.tetu .xi::before{content:'→';color:var(--tp,#6c63ff);flex-shrink:0}
 
-function genKey() {
-  const s = () => Math.random().toString(36).substring(2,7).toUpperCase();
-  return `CVITE-${s()}-${s()}-${s()}`;
+/* TECH */
+.ttech .hd{background:#0d0d0d;color:white;padding:2rem 2.4rem;display:grid;grid-template-columns:1fr auto;gap:1.3rem;align-items:center;border-bottom:2px solid var(--ta,#00ff88)}
+.ttech .nm{font-family:'Courier New',monospace;font-size:1.8rem;font-weight:700;color:var(--ta,#00ff88);line-height:1.05}
+.ttech .jt{font-size:0.88rem;color:rgba(255,255,255,0.5);font-family:'Courier New',monospace;margin-top:0.2rem}
+.ttech .cts{margin-top:0.8rem;display:flex;flex-wrap:wrap;gap:0.5rem}
+.ttech .ci{font-size:0.72rem;color:var(--ta,#00ff88);background:rgba(0,255,136,0.08);padding:0.2rem 0.6rem;border-radius:3px;font-family:'Courier New',monospace;border:1px solid rgba(0,255,136,0.2)}
+.ttech .ph{width:78px;height:78px;border-radius:4px;object-fit:cover;border:2px solid var(--ta,#00ff88);flex-shrink:0}
+.ttech .bd{background:#111;padding:1.7rem 2.4rem;display:grid;gap:2rem}
+.ttech .bd.col1{grid-template-columns:1fr}
+.ttech .bd.col2{grid-template-columns:1fr 195px}
+.ttech .sc{margin-bottom:1.3rem}.ttech .sc:last-child{margin-bottom:0}
+.ttech .sh{font-family:'Courier New',monospace;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--ta,#00ff88);border-bottom:1px solid rgba(0,255,136,0.2);padding-bottom:0.25rem;margin-bottom:0.8rem}
+.ttech .sm{font-size:0.81rem;color:#aaa;line-height:1.68}
+.ttech .ei{margin-bottom:0.92rem;padding:0.75rem;background:#1a1a1a;border-radius:6px;border-left:3px solid var(--ta,#00ff88)}
+.ttech .er{display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem}
+.ttech .et{font-weight:700;font-size:0.85rem;color:white}.ttech .ed{font-size:0.71rem;color:var(--ta,#00ff88);font-family:'Courier New',monospace;white-space:nowrap;flex-shrink:0}
+.ttech .ec{font-size:0.78rem;color:#888;font-weight:500}.ttech .ex{font-size:0.76rem;color:#888;margin-top:0.26rem;line-height:1.6}
+.ttech .sb{margin-bottom:0.48rem}.ttech .sbn{font-size:0.74rem;color:#aaa;margin-bottom:0.16rem;font-family:'Courier New',monospace}
+.ttech .sbb{background:#1a1a1a;border-radius:2px;height:4px;border:1px solid #333}.ttech .sbf{height:4px;border-radius:2px;background:var(--ta,#00ff88)}
+.ttech .tg{display:inline-block;background:rgba(0,255,136,0.08);color:var(--ta,#00ff88);border-radius:3px;padding:0.12rem 0.45rem;font-size:0.72rem;margin:0.09rem 0.07rem 0 0;font-family:'Courier New',monospace;border:1px solid rgba(0,255,136,0.2)}
+.ttech .li{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.4rem}
+.ttech .ln{font-size:0.78rem;font-weight:700;color:#ddd;font-family:'Courier New',monospace}.ttech .ll{font-size:0.71rem;color:#555}
+.ttech .xi{font-size:0.77rem;color:#888;margin-bottom:0.25rem;display:flex;gap:0.32rem}.ttech .xi::before{content:'$';color:var(--ta,#00ff88);flex-shrink:0;font-family:'Courier New',monospace}
+
+/* ELEGANT */
+.teleg .hd{background:#111;color:white;padding:2.5rem 3rem;display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:center;position:relative;overflow:hidden}
+.teleg .hd::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--ta,#c9a84c),transparent)}
+.teleg .nm{font-family:var(--serif);font-size:2.2rem;font-weight:400;letter-spacing:0.04em;line-height:1.05;color:white}
+.teleg .jt{font-size:0.75rem;color:var(--ta,#c9a84c);font-weight:400;margin-top:0.4rem;text-transform:uppercase;letter-spacing:0.25em}
+.teleg .cts{margin-top:1rem;display:flex;flex-wrap:wrap;gap:0.3rem 1.5rem}
+.teleg .ci{font-size:0.72rem;color:rgba(255,255,255,0.4);letter-spacing:0.05em}
+.teleg .ph{width:85px;height:85px;border-radius:50%;object-fit:cover;border:2px solid var(--ta,#c9a84c);flex-shrink:0}
+.teleg .bd{padding:2rem 3rem;display:grid;gap:2.5rem}
+.teleg .bd.col1{grid-template-columns:1fr}
+.teleg .bd.col2{grid-template-columns:1fr 195px}
+.teleg .sc{margin-bottom:1.5rem}.teleg .sc:last-child{margin-bottom:0}
+.teleg .sh{font-size:0.62rem;font-weight:400;text-transform:uppercase;letter-spacing:0.25em;color:var(--ta,#c9a84c);margin-bottom:1rem;padding-bottom:0.4rem;border-bottom:1px solid rgba(201,168,76,0.2)}
+.teleg .sm{font-size:0.82rem;color:#555;line-height:1.75;font-style:italic}
+.teleg .ei{margin-bottom:1.1rem;padding-bottom:1.1rem;border-bottom:1px solid #f5f0e5}.teleg .ei:last-child{border:none;margin-bottom:0;padding-bottom:0}
+.teleg .er{display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem}
+.teleg .et{font-weight:600;font-size:0.87rem;color:#111;font-family:var(--serif)}.teleg .ed{font-size:0.71rem;color:var(--ta,#c9a84c);letter-spacing:0.05em;white-space:nowrap;flex-shrink:0}
+.teleg .ec{font-size:0.79rem;color:#888;margin-top:0.06rem}.teleg .ex{font-size:0.78rem;color:#666;margin-top:0.3rem;line-height:1.65}
+.teleg .sb{margin-bottom:0.5rem}.teleg .sbn{font-size:0.75rem;color:#555;margin-bottom:0.18rem}
+.teleg .sbb{background:#f0ebe0;border-radius:0;height:2px}.teleg .sbf{height:2px;background:linear-gradient(90deg,var(--ta,#c9a84c),var(--ta2,#f0d98b))}
+.teleg .tg{display:inline-block;background:transparent;color:var(--ta,#c9a84c);border:1px solid var(--ta,#c9a84c);border-radius:2px;padding:0.12rem 0.5rem;font-size:0.71rem;margin:0.09rem 0.07rem 0 0}
+.teleg .li{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.45rem}
+.teleg .ln{font-size:0.79rem;font-weight:600;color:#333}.teleg .ll{font-size:0.71rem;color:#bbb}
+.teleg .xi{font-size:0.78rem;color:#666;margin-bottom:0.28rem;padding-left:0.8rem;position:relative}.teleg .xi::before{content:'—';position:absolute;left:0;color:var(--ta,#c9a84c)}
+
+@media print{body{background:white}.sidebar,.prev-bar,header,#licBanner,#splash,.lock-screen,.blocked-screen{display:none!important}.app{display:block;height:auto}.preview{background:white;padding:0}.cvp{box-shadow:none;max-width:100%;border-radius:0}}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#d0ccc5;border-radius:3px}
+</style>
+</head>
+<body>
+
+<div id="splash"><div class="splash-logo">CV<em>ite</em></div><div class="splash-spin"></div><div class="splash-msg">Vérification de la licence…</div></div>
+
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-card">
+    <div class="lc-logo">CV<em>ite</em></div>
+    <span class="lc-icon" id="lockIcon">🔐</span>
+    <div class="lc-title" id="lockTitle">Activation requise</div>
+    <div class="lc-sub" id="lockSub">Entrez votre clé d'activation pour accéder à CVite Pro.</div>
+    <input class="lc-input" type="password" id="licInput" placeholder="VOTRE CLÉ D'ACTIVATION" maxlength="64" autocomplete="off" onkeydown="if(event.key==='Enter')tryActivate()">
+    <button class="lc-btn" id="activateBtn" onclick="tryActivate()">Activer →</button>
+    <div class="lc-msg" id="lockMsg">&nbsp;</div>
+  </div>
+</div>
+
+<div class="blocked-screen" id="blockedScreen">
+  <div class="blocked-card"><span style="font-size:3rem">🔒</span><div class="bc-title">Accès désactivé</div><div class="bc-text" id="blockedMsg">Contactez votre prestataire.</div></div>
+</div>
+
+<div id="licBanner"><span id="bannerTxt"></span></div>
+
+<header>
+  <div class="logo">CV<em>ite</em><sup>PRO</sup></div>
+  <div class="hbtns">
+    <button class="hbtn hbtn-ghost" onclick="window.print()">🖨️ Imprimer</button>
+    <button class="hbtn hbtn-gold" onclick="pdfTip()">⬇️ PDF</button>
+  </div>
+</header>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="stabs">
+      <button class="stab on" onclick="switchTab('profil',this)">Profil</button>
+      <button class="stab" onclick="switchTab('parcours',this)">Parcours</button>
+      <button class="stab" onclick="switchTab('style',this)">Style</button>
+    </div>
+
+    <div class="spanel on" id="tab-profil">
+      <p class="sec-ttl">📷 Photo</p>
+      <div class="photo-zone"><input type="file" accept="image/*" onchange="loadPhoto(this)"><img id="photoPreview" src="" alt=""><div class="photo-ph" id="photoPh">👤</div><p style="font-size:0.72rem;color:#ccc;margin-top:0.27rem">Cliquez pour ajouter</p></div>
+      <p class="sec-ttl">🪪 Identité</p>
+      <div class="fg"><label>Prénom &amp; Nom</label><input type="text" id="fn" value="Marie Dupont" oninput="upd()"></div>
+      <div class="fg"><label>Titre / Poste visé</label><input type="text" id="ft" value="Responsable Marketing Senior" oninput="upd()"></div>
+      <div class="fg"><label>Résumé</label><textarea id="fs" oninput="upd()">Professionnelle dynamique avec 8 ans d'expérience en marketing digital. Reconnue pour ma créativité et ma capacité à atteindre des objectifs ambitieux.</textarea></div>
+      <p class="sec-ttl">📬 Coordonnées</p>
+      <div class="fg"><label>Email</label><input type="email" id="fe" value="marie.dupont@email.fr" oninput="upd()"></div>
+      <div class="fg"><label>Téléphone</label><input type="tel" id="fp" value="06 12 34 56 78" oninput="upd()"></div>
+      <div class="r2"><div class="fg"><label>Ville</label><input type="text" id="fc" value="Paris" oninput="upd()"></div><div class="fg"><label>LinkedIn</label><input type="text" id="fl" value="linkedin.com/in/mdupont" oninput="upd()"></div></div>
+      <p class="sec-ttl">✨ Extras</p>
+      <div class="fg"><label>Centres d'intérêt</label><input type="text" id="fh" value="Photographie, Voyages, Design" oninput="upd()"></div>
+      <div class="fg"><label>Disponibilité</label><input type="text" id="fd" value="Immédiate" oninput="upd()"></div>
+    </div>
+
+    <div class="spanel" id="tab-parcours">
+      <p class="sec-ttl">💼 Expériences</p>
+      <div id="expList"></div>
+      <button class="add-row" onclick="addExp()">＋ Ajouter une expérience</button>
+      <p class="sec-ttl" style="margin-top:0.1rem">🎓 Formation</p>
+      <div id="eduList"></div>
+      <button class="add-row" onclick="addEdu()">＋ Ajouter une formation</button>
+      <p class="sec-ttl" style="margin-top:0.1rem">🛠️ Compétences</p>
+      <div class="chips" id="chipList"></div>
+      <div class="skill-add" style="margin-top:0.35rem"><input type="text" id="skillIn" placeholder="Ajouter une compétence…" onkeydown="if(event.key==='Enter'){addSkill();event.preventDefault()}"><button class="sbtn sbtn-gold" onclick="addSkill()">＋</button></div>
+      <div id="lvlList"></div>
+      <p class="sec-ttl" style="margin-top:0.1rem">🌍 Langues</p>
+      <div id="langList"></div>
+      <button class="add-row" onclick="addLang()">＋ Ajouter une langue</button>
+    </div>
+
+    <div class="spanel" id="tab-style">
+      <p class="sec-ttl">🎨 Thème</p>
+      <div class="theme-grid">
+        <div class="topt on" onclick="setTheme('c',this)"><div class="tdot" style="background:#1a1a2e"></div>Classique</div>
+        <div class="topt" onclick="setTheme('m',this)"><div class="tdot" style="background:#0f3460"></div>Moderne</div>
+        <div class="topt" onclick="setTheme('n',this)"><div class="tdot" style="background:#111"></div>Minimaliste</div>
+        <div class="topt" onclick="setTheme('e',this)"><div class="tdot" style="background:linear-gradient(135deg,#6c63ff,#4834d4)"></div>Étudiant</div>
+        <div class="topt" onclick="setTheme('t',this)"><div class="tdot" style="background:#0d0d0d;border:2px solid #00ff88"></div>Tech</div>
+        <div class="topt" onclick="setTheme('l',this)"><div class="tdot" style="background:#111;border:2px solid #c9a84c"></div>Élégant</div>
+      </div>
+      <p class="sec-ttl" style="margin-top:0.1rem">🎨 Couleur d'accent</p>
+      <div class="color-grid" id="colorGrid"></div>
+      <p class="sec-ttl" style="margin-top:0.1rem">📐 Mise en page</p>
+      <div class="fg"><label>Colonnes</label><select id="oCols" onchange="upd()"><option value="2">2 colonnes</option><option value="1">1 colonne</option></select></div>
+      <p class="sec-ttl" style="margin-top:0.1rem">⚙️ Sections</p>
+      <div class="fg"><label>Photo</label><select id="oPh" onchange="upd()"><option value="1">Afficher</option><option value="0">Masquer</option></select></div>
+      <div class="fg"><label>Compétences</label><select id="oSk" onchange="upd()"><option value="1">Barres</option><option value="0">Étiquettes</option></select></div>
+      <div class="fg"><label>Résumé</label><select id="oSu" onchange="upd()"><option value="1">Afficher</option><option value="0">Masquer</option></select></div>
+      <div class="fg"><label>Langues</label><select id="oLg" onchange="upd()"><option value="1">Afficher</option><option value="0">Masquer</option></select></div>
+      <div class="fg"><label>Centres d'intérêt</label><select id="oHo" onchange="upd()"><option value="1">Afficher</option><option value="0">Masquer</option></select></div>
+      <div class="fg"><label>Disponibilité</label><select id="oDi" onchange="upd()"><option value="1">Afficher</option><option value="0">Masquer</option></select></div>
+    </div>
+  </div>
+
+  <div class="preview">
+    <div class="prev-bar">
+      <span class="prev-lbl">👁️ Aperçu en temps réel</span>
+      <div style="display:flex;gap:0.42rem"><button class="sbtn sbtn-gray" onclick="window.print()">🖨️</button><button class="sbtn sbtn-gold" onclick="pdfTip()">⬇️ PDF</button></div>
+    </div>
+    <div class="cvp tc" id="cvp"></div>
+  </div>
+</div>
+
+<script>
+function getStoredKey(){try{return localStorage.getItem('cvite_key')}catch(e){return null}}
+function storeKey(k){try{localStorage.setItem('cvite_key',k)}catch(e){}}
+function clearKey(){try{localStorage.removeItem('cvite_key')}catch(e){}}
+
+async function checkLicense(key){
+  try{
+    const r=await fetch('/api/license/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+    return await r.json();
+  }catch(e){return{ok:true,status:'offline',message:'⚠️ Mode hors-ligne'}}
 }
 
-function getIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+async function tryActivate(){
+  const key=document.getElementById('licInput').value.trim().toUpperCase();
+  const msg=document.getElementById('lockMsg');
+  const btn=document.getElementById('activateBtn');
+  if(!key){msg.textContent='Entrez votre clé.';return}
+  btn.disabled=true;btn.textContent='Vérification…';
+  const data=await checkLicense(key);
+  btn.disabled=false;btn.textContent='Activer →';
+  if(data.ok){storeKey(key);document.getElementById('lockScreen').classList.remove('show');document.getElementById('splash').style.display='none';showBanner(data);launchApp()}
+  else if(data.status==='blocked'){clearKey();document.getElementById('lockScreen').classList.remove('show');showBlocked(data.message)}
+  else{msg.textContent=data.message||'Clé invalide.'}
 }
 
-function requireAdmin(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ ok:false, error:'Non autorisé' });
-  try { jwt.verify(auth.slice(7), process.env.JWT_SECRET || 'secret'); next(); }
-  catch { res.status(401).json({ ok:false, error:'Session expirée' }); }
+function showBlocked(msg){
+  document.getElementById('splash').style.display='none';
+  document.getElementById('blockedMsg').innerHTML=(msg||'Accès désactivé.').replace(/\n/g,'<br>');
+  document.getElementById('blockedScreen').classList.add('show');
 }
 
-async function logEvent(clientId, event, detail=null, ip=null) {
-  await supabase.from('license_events').insert({ client_id:clientId, event, detail, ip });
+function showBanner(data){
+  const ban=document.getElementById('licBanner');
+  const txt=document.getElementById('bannerTxt');
+  if(!data.client)return;
+  ban.className='show '+(data.client.daysLeft<=7?'crit':'ok');
+  txt.textContent=data.message||'✅ Licence active';
 }
 
-app.use('/admin', express.static(path.join(__dirname, '../admin')));
-app.use('/', express.static(path.join(__dirname, '../client')));
+async function init(){
+  const key=getStoredKey();
+  if(!key){document.getElementById('splash').style.display='none';document.getElementById('lockScreen').classList.add('show');return}
+  const data=await checkLicense(key);
+  document.getElementById('splash').style.opacity=0;
+  setTimeout(()=>document.getElementById('splash').style.display='none',400);
+  if(data.status==='blocked'){clearKey();showBlocked(data.message);return}
+  if(data.status==='expired'){clearKey();document.getElementById('lockIcon').textContent='⏰';document.getElementById('lockTitle').textContent='Licence expirée';document.getElementById('lockSub').textContent=data.message||'Licence expirée.';document.getElementById('lockScreen').classList.add('show');return}
+  if(!data.ok&&data.status!=='offline'){clearKey();document.getElementById('lockScreen').classList.add('show');return}
+  showBanner(data);launchApp();
+}
 
-// ── VÉRIFICATION LICENCE ──
-app.post('/api/license/check', licLimiter, async (req, res) => {
-  const { key } = req.body;
-  const ip = getIp(req);
-  if (!key) return res.json({ ok:false, status:'invalid', message:'Clé manquante' });
+function launchApp(){renderLists();initColors();upd()}
+window.addEventListener('DOMContentLoaded',init);
 
-  const { data: client } = await supabase
-    .from('clients').select('*')
-    .eq('license_key', key.trim().toUpperCase()).single();
+const COLORS={
+  c:[{p:'#1a1a2e',a:'#c9a84c',a2:'#e8c85a',d:'#0d0d1a'},{p:'#1a0a0a',a:'#e74c3c',a2:'#ff6b6b',d:'#0d0505'},{p:'#0a1628',a:'#4a90d9',a2:'#74b3f0',d:'#060e1a'},{p:'#0a1f0f',a:'#27ae60',a2:'#52d68a',d:'#060f08'},{p:'#1a0a2e',a:'#9b59b6',a2:'#c39bd3',d:'#0d0518'}],
+  m:[{p:'#0f3460',a:'#00b4d8',a2:'#48cae4',d:'#16213e'},{p:'#1a0f00',a:'#f39c12',a2:'#f8c471',d:'#0d0800'},{p:'#2d0a1e',a:'#e91e8c',a2:'#f06292',d:'#1a0612'},{p:'#0a2018',a:'#1abc9c',a2:'#48e5c2',d:'#06120e'},{p:'#1a1050',a:'#5c6bc0',a2:'#9fa8da',d:'#0e0a30'}],
+  n:[{p:'#333',a:'#888',a2:'#aaa',d:'#222'},{p:'#111',a:'#c9a84c',a2:'#e8c85a',d:'#000'},{p:'#111',a:'#c0392b',a2:'#e74c3c',d:'#000'},{p:'#111',a:'#2980b9',a2:'#5dade2',d:'#000'},{p:'#111',a:'#27ae60',a2:'#52d68a',d:'#000'}],
+  e:[{p:'#6c63ff',a:'#a29bfe',a2:'#dfe6e9',d:'#4834d4'},{p:'#fd7272',a:'#ff9f43',a2:'#ffeaa7',d:'#d63031'},{p:'#0984e3',a:'#74b9ff',a2:'#dfe6e9',d:'#0652dd'},{p:'#e84393',a:'#fd79a8',a2:'#ffeaa7',d:'#c0134c'},{p:'#00b894',a:'#55efc4',a2:'#dfe6e9',d:'#00856f'}],
+  t:[{p:'#0d0d0d',a:'#00ff88',a2:'#00cc6a',d:'#050505'},{p:'#050a1a',a:'#00d4ff',a2:'#0099bb',d:'#020510'},{p:'#0d0805',a:'#ff6b35',a2:'#cc4411',d:'#080503'},{p:'#0d0010',a:'#ff0099',a2:'#cc0077',d:'#060008'},{p:'#0a0a00',a:'#ffff00',a2:'#cccc00',d:'#050500'}],
+  l:[{p:'#111',a:'#c9a84c',a2:'#f0d98b',d:'#000'},{p:'#1a1a1a',a:'#bdc3c7',a2:'#ecf0f1',d:'#0d0d0d'},{p:'#111',a:'#cd7f32',a2:'#e8a96a',d:'#000'},{p:'#111',a:'#7b2d3e',a2:'#b05068',d:'#000'},{p:'#111',a:'#2ecc71',a2:'#82e0aa',d:'#000'}]
+};
 
-  if (!client) return res.json({ ok:false, status:'invalid', message:'Clé invalide. Vérifiez et réessayez.' });
+let curColor=COLORS.c[0];
 
-  await supabase.from('clients').update({
-    last_check: new Date().toISOString(), last_ip: ip,
-    login_count: (client.login_count||0)+1
-  }).eq('id', client.id);
+function initColors(){renderColors('c')}
 
-  if (client.blocked) {
-    await logEvent(client.id, 'blocked_attempt', null, ip);
-    return res.json({ ok:false, status:'blocked', message: client.block_reason || 'Accès désactivé. Contactez votre prestataire.' });
+function renderColors(t){
+  const cols=COLORS[t]||COLORS.c;
+  document.getElementById('colorGrid').innerHTML=cols.map((c,i)=>`<div class="copt ${i===0?'on':''}" style="background:${c.a}" title="" onclick="setColor(${i},'${t}',this)"></div>`).join('');
+  curColor=cols[0];applyColors();
+}
+
+function setColor(i,t,el){
+  document.querySelectorAll('.copt').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');curColor=(COLORS[t]||COLORS.c)[i];applyColors();upd();
+}
+
+function applyColors(){
+  const cvp=document.getElementById('cvp');
+  if(!curColor)return;
+  cvp.style.setProperty('--tp',curColor.p);
+  cvp.style.setProperty('--ta',curColor.a);
+  cvp.style.setProperty('--ta2',curColor.a2);
+  cvp.style.setProperty('--td',curColor.d);
+}
+
+let ST={
+  theme:'c',photo:null,
+  experiences:[{title:'Responsable Marketing Digital',company:'Agence Nova Paris',date:'2020 — Présent',desc:'Pilotage des campagnes SEO/SEA. Croissance du trafic +140% en 18 mois.'},{title:'Chargée de Communication',company:'Startup Nexio',date:'2017 — 2020',desc:'Stratégie éditoriale et brand identity. 500k+ impressions.'}],
+  education:[{degree:'Master Marketing & Communication',school:'Sciences Po Paris',date:'2017',desc:'Mention Très Bien'},{degree:'Licence Info & Communication',school:'Université Paris IV',date:'2015',desc:''}],
+  skills:['Marketing Digital','SEO / SEA','Adobe Suite','Google Analytics','Réseaux sociaux','Management'],
+  levels:{'Marketing Digital':92,'SEO / SEA':86,'Adobe Suite':78,'Google Analytics':83,'Réseaux sociaux':95,'Management':73},
+  languages:[{lang:'Français',level:'Langue maternelle'},{lang:'Anglais',level:'Courant — C1'},{lang:'Espagnol',level:'Notions — B1'}]
+};
+
+function switchTab(n,el){document.querySelectorAll('.stab').forEach(b=>b.classList.remove('on'));document.querySelectorAll('.spanel').forEach(p=>p.classList.remove('on'));el.classList.add('on');document.getElementById('tab-'+n).classList.add('on')}
+function setTheme(t,el){ST.theme=t;document.querySelectorAll('.topt').forEach(o=>o.classList.remove('on'));el.classList.add('on');renderColors(t);upd()}
+function loadPhoto(inp){if(!inp.files||!inp.files[0])return;const r=new FileReader();r.onload=e=>{ST.photo=e.target.result;const p=document.getElementById('photoPreview');p.src=e.target.result;p.style.display='block';document.getElementById('photoPh').style.display='none';upd()};r.readAsDataURL(inp.files[0])}
+function addExp(){ST.experiences.push({title:'',company:'',date:'',desc:''});renderLists();upd()}
+function remExp(i){ST.experiences.splice(i,1);renderLists();upd()}
+function addEdu(){ST.education.push({degree:'',school:'',date:'',desc:''});renderLists();upd()}
+function remEdu(i){ST.education.splice(i,1);renderLists();upd()}
+function addSkill(){const inp=document.getElementById('skillIn');const v=inp.value.trim();if(!v)return;if(!ST.skills.includes(v)){ST.skills.push(v);ST.levels[v]=75}inp.value='';renderLists();upd()}
+function remSkill(i){const s=ST.skills[i];ST.skills.splice(i,1);delete ST.levels[s];renderLists();upd()}
+function setLvl(i,v){const s=ST.skills[i];if(!s)return;ST.levels[s]=parseInt(v);const el=document.getElementById('lv_'+i);if(el)el.textContent=v+'%';upd()}
+function addLang(){ST.languages.push({lang:'',level:''});renderLists();upd()}
+function remLang(i){ST.languages.splice(i,1);renderLists();upd()}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function g(id){const el=document.getElementById(id);return el?el.value.trim():''}
+
+function renderLists(){
+  document.getElementById('expList').innerHTML=ST.experiences.map((e,i)=>`<div class="ecard"><div class="ecard-head"><span class="ecard-lbl">${esc(e.title||'Expérience '+(i+1))}</span><button class="dbtn" onclick="remExp(${i})">✕</button></div><div class="r2"><div class="fg"><label>Poste</label><input type="text" value="${esc(e.title)}" placeholder="Intitulé du poste" oninput="ST.experiences[${i}].title=this.value;upd()"></div><div class="fg"><label>Entreprise</label><input type="text" value="${esc(e.company)}" placeholder="Entreprise" oninput="ST.experiences[${i}].company=this.value;upd()"></div></div><div class="fg"><label>Période</label><input type="text" value="${esc(e.date)}" placeholder="2021 — Présent" oninput="ST.experiences[${i}].date=this.value;upd()"></div><div class="fg"><label>Description</label><textarea oninput="ST.experiences[${i}].desc=this.value;upd()" placeholder="Missions...">${esc(e.desc)}</textarea></div></div>`).join('');
+  document.getElementById('eduList').innerHTML=ST.education.map((e,i)=>`<div class="ecard"><div class="ecard-head"><span class="ecard-lbl">${esc(e.degree||'Formation '+(i+1))}</span><button class="dbtn" onclick="remEdu(${i})">✕</button></div><div class="r2"><div class="fg"><label>Diplôme</label><input type="text" value="${esc(e.degree)}" placeholder="BTS, Master..." oninput="ST.education[${i}].degree=this.value;upd()"></div><div class="fg"><label>École</label><input type="text" value="${esc(e.school)}" placeholder="Établissement" oninput="ST.education[${i}].school=this.value;upd()"></div></div><div class="r2"><div class="fg"><label>Année</label><input type="text" value="${esc(e.date)}" placeholder="2022" oninput="ST.education[${i}].date=this.value;upd()"></div><div class="fg"><label>Mention</label><input type="text" value="${esc(e.desc)}" placeholder="Mention Bien..." oninput="ST.education[${i}].desc=this.value;upd()"></div></div></div>`).join('');
+  document.getElementById('chipList').innerHTML=ST.skills.map((s,i)=>`<div class="chip">${esc(s)}<button class="x" onclick="remSkill(${i})">×</button></div>`).join('');
+  document.getElementById('lvlList').innerHTML=ST.skills.length?'<p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#bbb;margin-top:0.15rem;margin-bottom:0.38rem">Niveaux</p>'+ST.skills.map((s,i)=>`<div class="slvl"><span class="slvl-name" title="${esc(s)}">${esc(s)}</span><input type="range" class="slvl-range" min="20" max="100" value="${ST.levels[s]||75}" oninput="setLvl(${i},this.value)"><span class="slvl-val" id="lv_${i}">${ST.levels[s]||75}%</span></div>`).join(''):'';
+  document.getElementById('langList').innerHTML=ST.languages.map((l,i)=>`<div class="ecard"><div class="ecard-head"><span class="ecard-lbl">${esc(l.lang||'Langue '+(i+1))}</span><button class="dbtn" onclick="remLang(${i})">✕</button></div><div class="r2"><div class="fg"><label>Langue</label><input type="text" value="${esc(l.lang)}" placeholder="Anglais..." oninput="ST.languages[${i}].lang=this.value;upd()"></div><div class="fg"><label>Niveau</label><input type="text" value="${esc(l.level)}" placeholder="Courant — C1" oninput="ST.languages[${i}].level=this.value;upd()"></div></div></div>`).join('');
+}
+
+function upd(){
+  const nm=g('fn'),jt=g('ft'),sm=g('fs'),em=g('fe'),ph=g('fp'),ct=g('fc'),li=g('fl'),hb=g('fh'),dp=g('fd');
+  const cols=g('oCols')||'2';
+  const oPh=g('oPh')!=='0',oSk=g('oSk')!=='0',oSu=g('oSu')!=='0',oLg=g('oLg')!=='0',oHo=g('oHo')!=='0',oDi=g('oDi')!=='0';
+  const photo=ST.photo&&oPh?ST.photo:null;
+  const T=ST.theme;
+  const cvp=document.getElementById('cvp');
+  const cls=T==='c'?'tc':T==='m'?'tm':T==='n'?'tmin':T==='e'?'tetu':T==='t'?'ttech':'teleg';
+  cvp.className='cvp '+cls;applyColors();
+
+  const ctItems=[em,ph,ct,li].filter(Boolean);
+  const exH=ST.experiences.length?ST.experiences.map(e=>`<div class="ei"><div class="er"><div class="et">${esc(e.title||'—')}</div><div class="ed">${esc(e.date)}</div></div>${e.company?`<div class="ec">${esc(e.company)}</div>`:''} ${e.desc?`<div class="ex">${esc(e.desc)}</div>`:''}</div>`).join(''):'<p class="cv-empty">À compléter…</p>';
+  const edH=ST.education.length?ST.education.map(e=>`<div class="ei"><div class="er"><div class="et">${esc(e.degree||'—')}</div><div class="ed">${esc(e.date)}</div></div>${e.school?`<div class="ec">${esc(e.school)}${e.desc?' — <em>'+esc(e.desc)+'</em>':''}</div>`:''}</div>`).join(''):'<p class="cv-empty">À compléter…</p>';
+  const skT=ST.skills.length?ST.skills.map(s=>`<span class="tg">${esc(s)}</span>`).join(''):'<p class="cv-empty">—</p>';
+  const skB=ST.skills.length?ST.skills.map(s=>`<div class="sb"><div class="sbn">${esc(s)}</div><div class="sbb"><div class="sbf" style="width:${ST.levels[s]||75}%"></div></div></div>`).join(''):'<p class="cv-empty">—</p>';
+  const skH=oSk?skB:skT;
+  const lgH=oLg&&ST.languages.length?ST.languages.map(l=>`<div class="li"><span class="ln">${esc(l.lang)}</span><span class="ll">${esc(l.level)}</span></div>`).join(''):'';
+  const hbH=oHo&&hb?hb.split(',').map(h=>`<div class="xi">${esc(h.trim())}</div>`).join(''):'';
+  const suH=oSu&&sm?`<div class="sc"><div class="sm">${esc(sm)}</div></div>`:'';
+  const dpH=oDi&&dp?`<div class="sc"><div class="sh">Disponibilité</div><div style="font-weight:700;font-size:0.82rem">${esc(dp)}</div></div>`:'';
+
+  const sideH=`<div><div class="sc"><div class="sh">Compétences</div>${skH}</div>${lgH?`<div class="sc"><div class="sh">Langues</div>${lgH}</div>`:''}${hbH?`<div class="sc"><div class="sh">Intérêts</div>${hbH}</div>`:''}${dpH}</div>`;
+  const extraCol1=cols==='1'?`<div class="sc"><div class="sh">Compétences</div>${skH}</div>${lgH?`<div class="sc"><div class="sh">Langues</div>${lgH}</div>`:''}${hbH?`<div class="sc"><div class="sh">Intérêts</div>${hbH}</div>`:''}${dpH}`:'';
+  const mainH=`<div>${suH}<div class="sc"><div class="sh">Expériences professionnelles</div>${exH}</div><div class="sc"><div class="sh">Formation & Diplômes</div>${edH}</div>${extraCol1}</div>`;
+  const phH=photo?`<img class="ph" src="${photo}" alt="Photo">`:'';
+
+  if(T==='m'){
+    cvp.innerHTML=`<div class="hd"><div class="hs">${photo?`<img class="ph" src="${photo}" alt="">`:'<div class="ph-ph">👤</div>'}${ct?`<div style="font-size:0.72rem;color:rgba(255,255,255,0.5);text-align:center">📍 ${esc(ct)}</div>`:''}</div><div class="hm"><div class="nm">${esc(nm)||'Prénom Nom'}</div><div class="jt">${esc(jt)||'Titre professionnel'}</div><div class="cts">${[em,ph,li].filter(Boolean).map(v=>`<span class="ci">• ${esc(v)}</span>`).join('')}</div></div></div><div class="bd col${cols}">${cols==='2'?`<div class="bl"><div class="sc"><div class="sh">Compétences</div>${skH}</div>${lgH?`<div class="sc"><div class="sh">Langues</div>${lgH}</div>`:''}${hbH?`<div class="sc"><div class="sh">Intérêts</div>${hbH}</div>`:''}${dpH}</div><div class="br">${suH}<div class="sc"><div class="sh">Expériences</div>${exH}</div><div class="sc"><div class="sh">Formation</div>${edH}</div></div>`:`<div class="br">${suH}<div class="sc"><div class="sh">Expériences</div>${exH}</div><div class="sc"><div class="sh">Formation</div>${edH}</div><div class="sc"><div class="sh">Compétences</div>${skH}</div>${lgH?`<div class="sc"><div class="sh">Langues</div>${lgH}</div>`:''}</div>`}</div>`;
+  } else if(T==='t'){
+    cvp.innerHTML=`<div class="hd"><div><div class="nm">${esc(nm)||'Prénom Nom'}</div><div class="jt">// ${esc(jt)||'Titre'}</div><div class="cts">${ctItems.map(v=>`<span class="ci">${esc(v)}</span>`).join('')}</div></div>${phH}</div><div class="bd col${cols}">${mainH}${cols==='2'?sideH:''}</div>`;
+  } else {
+    cvp.innerHTML=`<div class="hd"><div><div class="nm">${esc(nm)||'Prénom Nom'}</div><div class="jt">${esc(jt)||'Titre professionnel'}</div><div class="cts">${ctItems.map(v=>`<span class="ci">${T==='c'?'• ':''}${esc(v)}</span>`).join('')}${oDi&&dp?`<span class="ci">📅 ${esc(dp)}</span>`:''}</div></div>${phH}</div><div class="bd col${cols}">${mainH}${cols==='2'?sideH:''}</div>`;
   }
+}
 
-  if (client.expires_at && new Date() > new Date(client.expires_at)) {
-    await logEvent(client.id, 'expired_attempt', null, ip);
-    return res.json({ ok:false, status:'expired', message:'Licence expirée. Contactez votre prestataire.' });
-  }
-
-  await logEvent(client.id, 'check_ok', null, ip);
-  const exp = client.expires_at ? new Date(client.expires_at) : null;
-  const daysLeft = exp ? Math.ceil((exp - new Date()) / 86400000) : null;
-
-  return res.json({
-    ok:true, status:'active',
-    client: { name:client.name, company:client.company, plan:client.plan, daysLeft, expiresAt:client.expires_at },
-    message: daysLeft !== null
-      ? (daysLeft <= 7 ? `⚠️ Expire dans ${daysLeft} jour(s)` : `✅ Licence active — ${daysLeft} jours restants`)
-      : '✅ Licence active'
-  });
-});
-
-// ── LOGIN ADMIN ──
-app.post('/api/admin/login', admLimiter, (req, res) => {
-  if (req.body.password !== (process.env.ADMIN_PASSWORD || 'admin123'))
-    return res.status(401).json({ ok:false, error:'Mot de passe incorrect' });
-  const token = jwt.sign({ role:'admin' }, process.env.JWT_SECRET || 'secret', { expiresIn:'8h' });
-  res.json({ ok:true, token });
-});
-
-// ── LISTE CLIENTS ──
-app.get('/api/admin/clients', requireAdmin, async (req, res) => {
-  const { data } = await supabase.from('clients').select('*').order('created_at', { ascending:false });
-  res.json({ ok:true, clients: data||[] });
-});
-
-// ── CRÉER CLIENT ──
-app.post('/api/admin/clients', requireAdmin, async (req, res) => {
-  const { name, email, company, plan, days, notes } = req.body;
-  if (!name || !email) return res.status(400).json({ ok:false, error:'Nom et email obligatoires' });
-  const id  = uuid();
-  const key = genKey();
-  const exp = days ? new Date(Date.now() + parseInt(days)*86400000).toISOString() : null;
-  const { data, error } = await supabase.from('clients').insert({
-    id, name, email:email.toLowerCase(), company:company||null,
-    plan:plan||'yearly', status:'active', license_key:key,
-    expires_at:exp, notes:notes||null, blocked:false, login_count:0
-  }).select().single();
-  if (error) return res.status(400).json({ ok:false, error: error.message.includes('unique') ? 'Email déjà enregistré' : 'Erreur serveur' });
-  await logEvent(id, 'created', `Plan: ${plan}`, null);
-  res.json({ ok:true, client:data });
-});
-
-// ── BLOQUER ──
-app.put('/api/admin/clients/:id/block', requireAdmin, async (req, res) => {
-  const { reason } = req.body;
-  await supabase.from('clients').update({ blocked:true, block_reason:reason||'Accès révoqué' }).eq('id', req.params.id);
-  await logEvent(req.params.id, 'blocked', reason, null);
-  res.json({ ok:true, message:'Client bloqué' });
-});
-
-// ── DÉBLOQUER ──
-app.put('/api/admin/clients/:id/unblock', requireAdmin, async (req, res) => {
-  const exp = req.body.days ? new Date(Date.now() + parseInt(req.body.days)*86400000).toISOString() : null;
-  await supabase.from('clients').update({ blocked:false, block_reason:null, status:'active', ...(exp?{expires_at:exp}:{}) }).eq('id', req.params.id);
-  await logEvent(req.params.id, 'unblocked', null, null);
-  res.json({ ok:true, message:'Client réactivé' });
-});
-
-// ── PROLONGER ──
-app.put('/api/admin/clients/:id/extend', requireAdmin, async (req, res) => {
-  const { days } = req.body;
-  if (!days || parseInt(days)<1) return res.status(400).json({ ok:false, error:'Jours invalide' });
-  const { data:client } = await supabase.from('clients').select('expires_at').eq('id', req.params.id).single();
-  const base = (client?.expires_at && new Date(client.expires_at) > new Date()) ? new Date(client.expires_at) : new Date();
-  const newExp = new Date(base.getTime() + parseInt(days)*86400000).toISOString();
-  await supabase.from('clients').update({ expires_at:newExp, status:'active', blocked:false }).eq('id', req.params.id);
-  await logEvent(req.params.id, 'extended', `+${days} jours`, null);
-  res.json({ ok:true, message:`Prolongé jusqu'au ${new Date(newExp).toLocaleDateString('fr-FR')}` });
-});
-
-// ── NOUVELLE CLÉ ──
-app.put('/api/admin/clients/:id/renew-key', requireAdmin, async (req, res) => {
-  const newKey = genKey();
-  await supabase.from('clients').update({ license_key:newKey }).eq('id', req.params.id);
-  await logEvent(req.params.id, 'key_renewed', null, null);
-  res.json({ ok:true, newKey, message:'Nouvelle clé générée' });
-});
-
-// ── SUPPRIMER ──
-app.delete('/api/admin/clients/:id', requireAdmin, async (req, res) => {
-  await supabase.from('license_events').delete().eq('client_id', req.params.id);
-  await supabase.from('clients').delete().eq('id', req.params.id);
-  res.json({ ok:true, message:'Client supprimé' });
-});
-
-// ── HISTORIQUE ──
-app.get('/api/admin/clients/:id/events', requireAdmin, async (req, res) => {
-  const { data } = await supabase.from('license_events').select('*')
-    .eq('client_id', req.params.id).order('created_at', { ascending:false }).limit(100);
-  res.json({ ok:true, events:data||[] });
-});
-
-// ── STATS ──
-app.get('/api/admin/stats', requireAdmin, async (req, res) => {
-  const { data:clients } = await supabase.from('clients').select('*');
-  const now = new Date();
-  const total   = clients?.length||0;
-  const blocked = clients?.filter(c=>c.blocked).length||0;
-  const expired = clients?.filter(c=>!c.blocked&&c.expires_at&&new Date(c.expires_at)<now).length||0;
-  const active  = total-blocked-expired;
-  const yesterday = new Date(now-86400000).toISOString();
-  const { data:events } = await supabase.from('license_events').select('*').eq('event','check_ok').gte('created_at', yesterday);
-  res.json({ ok:true, stats:{ total, active, blocked, expired, checks_today:events?.length||0 } });
-});
-
-app.listen(PORT, () => console.log(`✅ CVite Pro démarré sur le port ${PORT}`));
-module.exports = app;
-a
+function pdfTip(){alert('📄 Exporter en PDF :\n\n1. Ctrl+P (ou Cmd+P)\n2. Destination → "Enregistrer en PDF"\n3. Désactivez en-têtes & pieds de page\n4. Enregistrer ✅')}
+</script>
+</body>
+</html>
